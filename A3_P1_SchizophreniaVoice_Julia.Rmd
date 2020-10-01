@@ -107,7 +107,17 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
+
+demo <- read.csv("DemographicData.csv", sep = ";")
+demo %>% filter(Diagnosis == "Control") 
 library(tidyverse)
+
+danish <- demo %>% filter(Language == "Danish") 
+danish %>% group_by(Diagnosis) %>%  summarise(age_count=n())
+
+danish$ID <- 1:264
+
+
 
 read_pitch <- function(filename) {
     # load data
