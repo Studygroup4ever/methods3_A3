@@ -117,7 +117,7 @@ danish %>% group_by(Diagnosis) %>%  summarise(age_count=n())
 
 danish$ID <- 1:264
 
-
+arti <- read.delim("Articulation.txt", sep =",")
 
 read_pitch <- function(filename) {
     # load data
@@ -160,7 +160,7 @@ write_csv(pitch_data, ...)
 ## Now we need to describe our sample
 
 First look at the missing data: we should exclude all recordings for which we do not have complete data.
-Then count the participants and recordinsgs by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
+Then count the participants and recordings by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
 Finally, do the same by diagnosis and study, to assess systematic differences in studies.
 I like to use group_by() %>% summarize() for quick summaries
 
