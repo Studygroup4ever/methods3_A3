@@ -120,19 +120,17 @@ arti <- read.delim('Articulation.txt', sep = ',', header = T)
 
 trial <- read.delim('Pitch/Study1D0S101T1_f0.txt', sep = '\t', header = T)
 
-f_name <- 'Study1D0S10T1_f0.txt'
+f_name <- 'Study1D0S10T1T2_f0.txt'
 
-str_extract(f_name, 'S(\\d\\d\\d|\\d\\d)')
 
 read_pitch <- function(filename) {
     # load data
     df <- read.delim(filename, sep = ',', header = T)
     # parse filename to extract study, diagnosis, subject and trial
-    #Study1D0S101T1_f0
     Study <- str_extract(filename, 'Study.')
-    Diagnosis <- str_extract(filename, '\\d D.')
+    Diagnosis <- str_extract(filename, 'D.')
     Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
-    Trial <- 
+    Trial <- str_extract(filename, 'T(\\dT\\d|\\d)')
     # extract pitch descriptors (mean, sd, iqr, etc)
     
     # combine all this data in one dataset
