@@ -120,13 +120,18 @@ read_pitch <- function(filename) {
     Diagnosis = str_extract(filename, 'D.') %>% 
         str_remove('D')
     
-    Subject = str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') #Look for S followed by 3 digits first, then S followed by 2 digits
+    Subject = str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') %>%  #Look for S followed by 3 digits first, then S followed by 2 digits
+        str_remove('S')
     
     # To find trial, we will specify the position of T (because some filenames include an end saying like "T12T13", and then we take the rest of the name)
     pos = str_locate(filename, 'T')[1] # Locating T, where we get a start and an end. We are only interested in the 'Start', the first value, so we index [1]
     split = length((str_split(filename, ''))[[1]]) # Split by 'nothing', so split everything that has nothing in between it = everything. Then, taking the length of that and indexing by 1 also. We take the length because that value will be the same as 'location of the end of the filename'
     
     Trial = substr(filename, pos, split) # Extracting from filename whatever is between pos (position of first occuring T) until the end of the filename ( substr(file, start, end).)
+    
+    Trial <- ifelse(str_detect(Trial, '_') == T, #if it has an underscore, remove _f0.txt, otherwise just .txt
+                    str_remove(Trial, '_f0.txt'), 
+                    str_remove(Trial, '.txt'))
     
     # extract pitch descriptors (mean, sd, iqr, etc)
     mean = mean(df$f0)
@@ -135,46 +140,56 @@ read_pitch <- function(filename) {
     median = median(df$f0)
     
     # combine all this data in one dataset
-    data = c(filename, Study, Diagnosis, Subject, mean, sd, iqr, median)
+    data = c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
     #data <- data %>% as.data.frame()
     #data <- data %>% t()
-    #colnames(data) <- c("filename", "Study", "Diagnosis", "Subject", "mean", "sd", "iqr", "median" )
+    #colnames(data) <- c("filename", "Study", "Diagnosis", "Subject", "Trial", "mean", "sd", "iqr", "median" )
     return(data)
 }
 
 # test it on just one file while writing the function
-test_data = read_pitch("Study1D0S101T1_f0.txt")
-test_data
+test_data = read_pitch('Pitch/Study1D0S101T1_f0.txt')
 
-# when you've created a function that works:
-pitch_data = list.files(path = "/Users/pernillebrams/Desktop/EM3/methods3_A3/Pitch",pattern = ".txt", full.names = TRUE)
+# adding Pitch to the filenames (in front)
+pastyp <- function(filename){
+    filename <- paste('Pitch/', filename, sep = '')
+    return(filename)
+}
+```
 
-t <- pitch_data %>% 
-    purrr::map_df(read_pitch) #map_df applies function to each element of list
 
-# when you've created a function that works, you can
-pitch_data = list.files(path = "EM3/methods3_A3/Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
-    purrr::map_df(read_pitch)
-      
+```{r}
+
+setwd('/Users/pernillebrams/Desktop/EM3/methods3_A3')
+
+# my list
+pitch_data = list.files(path = "Pitch/",pattern = ".txt") %>% 
+    lapply(pastyp) %>% #adding Pitch to the filenames
+    data.frame() %>% 
+    purrr::map_df(read_pitch) %>% #applying read_pitch function to each element in the list
+    t() %>% 
+    data.frame()
+
+# Fixing the column names
+colnames(pitch_data) <- c('Filename',
+                          'Study',
+                          'Diagnosis',
+                          'Subject',
+                          'Trial',
+                          'Mean',
+                          'SD',
+                          'IQR',
+                          'Median')
+
+# Fixing rownames
+rownames(pitch_data) <- 1:nrow(pitch_data) #giving the rows numbers from 1 to total number of rows of pitch_dataframe
+
+
 write_csv(pitch_data, ...)
 
 ```
 
-Trying to use daniels code
 ```{r}
-setwd("/Users/pernillebrams/Desktop/EM3/methods3_A3/Pitch")
-
-df_big = NULL
-
-read_pitch(for (i in 1:length(pitch_data)) {
-    small = read.table(pitch_data[i], header = T)
-    small$filename = str_sub(pitch_data[i])
-    i = read_pitch(i)
-    df_big = rbind(small,df_big)
-    print(i)
-}
-
-read_pitch(pitch_data)
 
 # for (i in 1:length(pitch_data)) {
 #     small = read.table(pitch_data[i], header = T)
