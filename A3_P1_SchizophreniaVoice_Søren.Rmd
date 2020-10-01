@@ -120,26 +120,57 @@ arti <- read.delim('Articulation.txt', sep = ',', header = T)
 
 trial <- read.delim('Pitch/Study1D0S101T1_f0.txt', sep = '\t', header = T)
 
-f_name <- 'Study1D0S10T1T2_f0.txt'
-
+# IQR(trial$f0)
+# 
+# f_name <- 'Study1D0S10T12T13_f0.txt'
+# 
+# str_extract(f_name, 'S(\\d\\d\\d|\\d\\d)')
+# 
+# pos <- str_locate(f_name, 'T')[1]
+# 
+# strsplit(f_name, '')
+# 
+# length(split[[1]])
+# 
+# substr(f_name, pos, length(split[[1]]))
 
 read_pitch <- function(filename) {
     # load data
-    df <- read.delim(filename, sep = ',', header = T)
+    df <- read.delim(filename, sep = '\t', header = T)
+    
     # parse filename to extract study, diagnosis, subject and trial
-    Study <- str_extract(filename, 'Study.')
-    Diagnosis <- str_extract(filename, 'D.')
-    Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
-    Trial <- str_extract(filename, 'T(\\dT\\d|\\d)')
+    Study <- str_extract(filename, 'Study.') %>% 
+        str_remove('Study')
+    
+    Diagnosis <- str_extract(filename, 'D.') %>% 
+        str_remove('D')
+    
+    Subject <-
+        str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
+    
+    pos <- str_locate(filename, 'T')[1]
+    split <- strsplit(filename, '')
+    Trial <- substr(filename, pos, length(split[[1]]))
+    
     # extract pitch descriptors (mean, sd, iqr, etc)
+    mean <- mean(df$f0)
+    sd <- sd(df$f0)
+    iqr <- IQR(df$f0)
+    median <- median(df$f0)
     
     # combine all this data in one dataset
-    data <- c(f_name, Study, Diagnosis, Subject)
+    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    
     return(data)
 }
 
 # test it on just one file while writing the function
-test_data = read_pitch("Pitch/a_file_to_test.txt")
+test_data = read_pitch("Pitch/Study1D0S101T1_f0.txt")
+test_data
+
+
+Subject <- str_extract("Study1D0S101T1_f0.txt", 'S(\\d\\d\\d | \\d\\d)')
+
 
 # when you've created a function that works, you can
 pitch_data = list.files(path = "Pitch/", pattern = ".txt") 
