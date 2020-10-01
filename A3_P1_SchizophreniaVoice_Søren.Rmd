@@ -108,15 +108,35 @@ See placeholder code here for help.
 
 ```{r}
 library(tidyverse)
+library(stringr)
+
+DemData <- read.csv("DemographicData.csv", sep = ';', header = T)
+
+DemDan <- DemData %>% 
+    filter(Language == "Danish") %>% 
+    mutate(ID = 1:264)
+
+arti <- read.delim('Articulation.txt', sep = ',', header = T)
+
+trial <- read.delim('Pitch/Study1D0S101T1_f0.txt', sep = '\t', header = T)
+
+f_name <- 'Study1D0S10T1_f0.txt'
+
+str_extract(f_name, 'S(\\d\\d\\d|\\d\\d)')
 
 read_pitch <- function(filename) {
     # load data
-    
+    df <- read.delim(filename, sep = ',', header = T)
     # parse filename to extract study, diagnosis, subject and trial
-    
+    #Study1D0S101T1_f0
+    Study <- str_extract(filename, 'Study.')
+    Diagnosis <- str_extract(filename, '\\d D.')
+    Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
+    Trial <- 
     # extract pitch descriptors (mean, sd, iqr, etc)
     
     # combine all this data in one dataset
+    data <- c(f_name, Study, Diagnosis, Subject)
     return(data)
 }
 
@@ -124,7 +144,9 @@ read_pitch <- function(filename) {
 test_data = read_pitch("Pitch/a_file_to_test.txt")
 
 # when you've created a function that works, you can
-pitch_data = list.files(path = "Assignment3/data/Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
+pitch_data = list.files(path = "Pitch/", pattern = ".txt") 
+
+%>% ## NB replace with your path to the files
     purrr::map_df(read_pitch)
 
 write_csv(pitch_data, ...)
