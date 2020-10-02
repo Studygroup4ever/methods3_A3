@@ -255,7 +255,7 @@ sounddata$Study.x ==sounddata$Study.y
 
 # Now we save them
 
-write.csv(sounddata, "sounddata.csv")
+
 
 sounddata <-  sounddata %>% filter(Study.x < 5)
 
@@ -272,8 +272,9 @@ I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
 sounddata <- sounddata %>%  na.omit()
+write.csv(sounddata, "sounddata.csv")
 
-sounddata %>% group_by(Study.x) %>%  summarise(mean(SANS))
+sounddata %>% group_by(Study.x) %>%  summarise(mean(Age))
 ```
 
 ## Now we can analyze the data
