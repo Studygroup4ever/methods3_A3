@@ -132,7 +132,6 @@ write_csv(pitch_data, ...)
 
 
 
-
 read_pitch <- function(filename) {
     # load data
     df <- read.delim(filename, sep = '\t', header = T)
@@ -165,6 +164,10 @@ read_pitch <- function(filename) {
                     str_remove(Trial, '_f0.txt'), 
                     str_remove(Trial, '.txt'))
     
+    soundname <- ifelse(str_detect(filename, '_') == T, 
+                    str_remove(filename, '_f0.txt'), 
+                    str_remove(filename, '.txt')) %>%  str_remove('Pitch/')
+    
     # extract pitch descriptors (mean, sd, iqr, etc)
     mean <- mean(df$f0)
     sd <- sd(df$f0)
@@ -172,7 +175,7 @@ read_pitch <- function(filename) {
     median <- median(df$f0)
     
     # combine all this data in one dataset
-    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    data <- c(soundname, filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
     
     return(data)
 }
@@ -189,7 +192,7 @@ pastyp <- function(filename){
 
 
 
-
+# Loading the mf data YAYA
 pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list of file names
     lapply(pastyp) %>% # Adding 'Pitch/' to the file names
     data.frame() %>% # Making the list into a data frame... I works this way - don't ask why..
@@ -198,7 +201,7 @@ pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list
     data.frame() # Making it into a data frame
 
 # Fixing the column names
-colnames(pitch_data) <- c('Filename',
+colnames(pitch_data) <- c('soundname', 'Filename',
                           'Study',
                           'Diagnosis',
                           'Subject',
@@ -219,6 +222,8 @@ Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>%
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
+?write.csv
+write.csv(pitch_data, 'pitch_data.csv')
 
 ```
 
@@ -228,12 +233,21 @@ Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 ```{r}
 # Let's start with the demographic and clinical data
 
-merge(Dem_data)
+
 
 # then duration data
 
+colnames(pitch_data)[5] <- "Participant"
+pitch_data <- pitch_data %>% filter(Study <5)
+
+
+Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Schizophrenia", as.numeric(Dem_data$Participant)+1000, Dem_data$Participant)
+
+pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "1", as.numeric(pitch_data$Participant)+1000, pitch_data$Participant)
 # Finally the pitch data
 
+dempitch <- merge(Arti_data, pitch_data, by = 'soundname') %>% filter(Study <5)
+sounddata <- merge(dempitch, Dem_data, by = 'Participant')
 # Now we merge them
 
 # Now we save them
