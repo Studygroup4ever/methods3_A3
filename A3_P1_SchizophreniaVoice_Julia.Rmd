@@ -238,7 +238,7 @@ write.csv(pitch_data, 'pitch_data.csv')
 # then duration data
 
 colnames(pitch_data)[5] <- "Participant"
-pitch_data <- pitch_data %>% filter(Study <5)
+
 
 
 Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Schizophrenia", as.numeric(Dem_data$Participant)+1000, Dem_data$Participant)
@@ -246,13 +246,20 @@ Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Schizophrenia", as.numeric
 pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "1", as.numeric(pitch_data$Participant)+1000, pitch_data$Participant)
 # Finally the pitch data
 
-dempitch <- merge(Arti_data, pitch_data, by = 'soundname') %>% filter(Study <5)
+dempitch <- merge(Arti_data, pitch_data, by = 'soundname') 
 sounddata <- merge(dempitch, Dem_data, by = 'Participant')
+
+sounddata$Study.x ==sounddata$Study.y 
+
 # Now we merge them
 
 # Now we save them
 
 write.csv(sounddata, "sounddata.csv")
+
+sounddata <-  sounddata %>% filter(Study.x < 5)
+
+
 
 ```
 
@@ -264,7 +271,9 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
+sounddata <- sounddata %>%  na.omit()
 
+sounddata %>% group_by(Study.x) %>%  summarise(mean(SANS))
 ```
 
 ## Now we can analyze the data
