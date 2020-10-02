@@ -252,6 +252,8 @@ sounddata <- merge(dempitch, Dem_data, by = 'Participant')
 
 # Now we save them
 
+write.csv(sounddata, "sounddata.csv")
+
 ```
 
 ## Now we need to describe our sample
