@@ -186,9 +186,9 @@ colnames(pitch_data) <- c('soundname',
 # Fixing rownames
 rownames(pitch_data) <- 1:nrow(pitch_data) #giving the rows numbers from 1 to total number of rows of pitch_dataframe
 
-# Filter study 1-4
-pitch_data <- pitch_data %>% 
-    filter(Study <= 4)
+# Filter study 1-4 (gonna wait)
+#pitch_data <- pitch_data %>% 
+#    filter(Study <= 4)
 
 #write_csv(pitch_data, "pitch_data_danish_only.csv")
 ```
@@ -229,9 +229,21 @@ Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
 # Finally the pitch data
 
+        # Before merge, we want to add 1000 for Schizoprenia: (have 1-4 in pitch dem)
+Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Schizophrenia", as.numeric(Dem_data$Participant)+1000, Dem_data$Participant)
+
+pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "1", as.numeric(pitch_data$Participant)+1000, pitch_data$Participant)
+
 # Now we merge them
-# To merge, we want to add 1000 for Schizoprenia:
-Dem_data$Participant
+merged_df <- merge(pitch_data, Arti_data, by = 'soundname')
+
+merged_df <- merge(merged_df,Dem_data, by = 'Participant')
+
+merged_df <- merged_df %>% filter(Study.x <5)
+
+merged_df <- merged_df %>% filter(Study.y <5)
+
+
 # Now we save them
 
 ```
@@ -244,8 +256,28 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
+sounddata <- merged_df
+
+sounddata <- sounddata %>% 
+    na.omit()
+
+# count participants
+sounddata %>% group_by(Gender) %>% summarise(mean(Age)) #F = 21.8, M = 23.8
+
+sub <- sounddata %>% subset(Diagnosis.y =="Schizophrenia")
+sounddata$Diagnosis.y <- as.factor(sounddata$Diagnosis.y)
+levels(sounddata$Diagnosis.y)
+
+sub %>% summarise(mean(Age))
+
 
 ```
+
+Check if study is the same
+```{r}
+unique(sounddata$Study.x == sounddata$Study.y)
+```
+
 
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
