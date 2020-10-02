@@ -120,10 +120,8 @@ danish$ID <- 1:264
 arti <- read.delim("Articulation.txt", sep =",")
 
 read_pitch <- function(filename) {
-    # load data
-    
+    # load data 
     # parse filename to extract study, diagnosis, subject and trial
-    
     # extract pitch descriptors (mean, sd, iqr, etc)
     
     # combine all this data in one dataset
