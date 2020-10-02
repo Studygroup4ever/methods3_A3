@@ -205,7 +205,6 @@ Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>%
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
-#write.csv(pitch_data, 'pitch_data.csv')
 ```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
@@ -237,6 +236,8 @@ unique(df$Study.x == df$Study.y)
 
 # Finally the pitch data
 #View(df)
+
+write.csv(df, 'pitch_data_filtered.csv')
 ```
 
 ## Now we need to describe our sample
@@ -247,6 +248,8 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
+df <- read.csv('pitch_data_danish_only.csv')
+
 
 ```
 
