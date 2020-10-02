@@ -1,7 +1,7 @@
 ---
 title: "Assignment 3 - Part 1 - Voice In Schizophrenia"
-author: "Søren Orm Hansen"
-date: "October, 2020"
+author: "Riccardo Fusaroli"
+date: "August 09, 2019"
 output: html_document
 ---
 
@@ -107,73 +107,68 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
-library(pacman)
+pacman::p_load(tidyverse, stringr,purrr)
 
-p_load(purrr, tidyverse)
-```
-
-
-```{r}
 read_pitch <- function(filename) {
     # load data
-    df <- read.delim(filename, sep = '\t', header = T)
+    df <- read.delim(filename, sep = "\t", header = T ) #Because they are tab separated
     
-    # Parse file name to extract study, diagnosis, subject and trial
-    # Finding the pattern 'Study', selecting the pattern and the next character
-    Study <- str_extract(filename, 'Study.') %>% 
-        str_remove('Study') # Removing 'Study'
+    # parse filename to extract study, diagnosis, subject and trial
+    Study = str_extract(filename,'Study.') %>% 
+        str_remove('Study') 
     
-    # Finding the pattern 'D', selecting the pattern and the next character
-    Diagnosis <- str_extract(filename, 'D.') %>% 
-        str_remove('D') # Removing 'D'
+    Diagnosis = str_extract(filename, 'D.') %>% 
+        str_remove('D')
     
-    # Finding the pattern 'S with 2 or 3 digits after it' and selecting the pattern 
-    Subject <-
-        str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') %>% 
-        str_remove('S') # Removing 'S'
+    Subject = str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') %>%  #Look for S followed by 3 digits first, then S followed by 2 digits
+        str_remove('S')
     
-    # Finding the position of the first T in the file name
-    pos <- str_locate(filename, 'T')[1]
+    # To find trial, we will specify the position of T (because some filenames include an end saying like "T12T13", and then we take the rest of the name)
+    pos = str_locate(filename, 'T')[1] # Locating T, where we get a start and an end. We are only interested in the 'Start', the first value, so we index [1]
+    split = length((str_split(filename, ''))[[1]]) # Split by 'nothing', so split everything that has nothing in between it = everything. Then, taking the length of that and indexing by 1 also. We take the length because that value will be the same as 'location of the end of the filename'
     
-    # Finding the number of characters in the file name (to index the last character in the next step)
-    len_split <- length(strsplit(filename, '')[[1]])
+    Trial = substr(filename, pos, split) # Extracting from filename whatever is between pos (position of first occuring T) until the end of the filename ( substr(file, start, end).)
     
-    # Saving everything in the file name from the first T to the last character
-    Trial <- substr(filename, pos, len_split) 
-    
-    # Removing the part after trial
-    Trial <- ifelse(str_detect(Trial, '_') == T, 
+    Trial <- ifelse(str_detect(Trial, '_') == T, #if it has an underscore, remove _f0.txt, otherwise just .txt
                     str_remove(Trial, '_f0.txt'), 
                     str_remove(Trial, '.txt'))
     
     # extract pitch descriptors (mean, sd, iqr, etc)
-    mean <- mean(df$f0)
-    sd <- sd(df$f0)
-    iqr <- IQR(df$f0)
-    median <- median(df$f0)
+    mean = mean(df$f0)
+    sd = sd(df$f0)
+    iqr = IQR(df$f0)
+    median = median(df$f0)
     
     # combine all this data in one dataset
-    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
-    
+    data = c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    #data <- data %>% as.data.frame()
+    #data <- data %>% t()
+    #colnames(data) <- c("filename", "Study", "Diagnosis", "Subject", "Trial", "mean", "sd", "iqr", "median" )
     return(data)
 }
 
-# Function for adding 'Pitch/' to the file names 
+# test it on just one file while writing the function
+test_data = read_pitch('Pitch/Study1D0S101T1_f0.txt')
+
+# adding Pitch to the filenames (in front)
 pastyp <- function(filename){
     filename <- paste('Pitch/', filename, sep = '')
     return(filename)
 }
-
 ```
 
+
 ```{r}
-# Loading the mf data YAYA
-pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list of file names
-    lapply(pastyp) %>% # Adding 'Pitch/' to the file names
-    data.frame() %>% # Making the list into a data frame... I works this way - don't ask why..
-    purrr::map_df(read_pitch) %>% # Mapping the read_pitch function on the file names
-    t() %>% # Dunno, it has the wrong direction
-    data.frame() # Making it into a data frame
+
+setwd('/Users/pernillebrams/Desktop/EM3/methods3_A3')
+
+# my list
+pitch_data = list.files(path = "Pitch/",pattern = ".txt") %>% 
+    lapply(pastyp) %>% #adding Pitch to the filenames
+    data.frame() %>% 
+    purrr::map_df(read_pitch) %>% #applying read_pitch function to each element in the list
+    t() %>% 
+    data.frame()
 
 # Fixing the column names
 colnames(pitch_data) <- c('Filename',
@@ -186,20 +181,36 @@ colnames(pitch_data) <- c('Filename',
                           'IQR',
                           'Median')
 
-# Dunno why the row names are weird, but now they are fixed 
-rownames(pitch_data) <- 1:nrow(pitch_data)
+# Fixing rownames
+rownames(pitch_data) <- 1:nrow(pitch_data) #giving the rows numbers from 1 to total number of rows of pitch_dataframe
 
-# Loading more data, selecting only the Danish study
-Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
-    filter(Language == "Danish") %>% 
-    mutate(ID = 1:264)
 
-# Loading more data
-Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
+write_csv(pitch_data, ...)
 
 ```
 
+```{r}
 
+# for (i in 1:length(pitch_data)) {
+#     small = read.table(pitch_data[i], header = T)
+#     small$filename = str_sub(pitch_data[i])
+#     i = read_pitch(i)
+#     df_big = rbind(small,df_big)
+#     print(i)
+# }
+
+# store = NULL
+# for (i in 1:2) {
+#         lille = read.table(list[i], header = T)
+#         lille$dirname = str_sub(list[i])
+#         lille$study = str_sub(lille$dirname,8,13)
+#         lille$diagnosis = str_sub(lille$dirname,14,15)
+#         lille$subject = str_sub(lille$dirname,16,17)
+#         lille$trial = str_sub(lille$dirname,14,15)
+#         store = rbind(store,lille)
+#         print(i)
+#         
+```
 
 
 ### Now you need to merge demographic/clinical, duration and pitch data

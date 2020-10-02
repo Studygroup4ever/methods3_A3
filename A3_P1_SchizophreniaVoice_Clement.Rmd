@@ -97,6 +97,20 @@ NB. the filenames indicate:
 - S: the subject ID (NB. some controls and schizophrenia are matched, so there is a 101 schizophrenic and a 101 control). Also note that study 5-6 have weird numbers and no matched participants, so feel free to add e.g. 1000 to the participant ID in those studies.
 - T: the trial, that is, the recording ID for that participant, 1-10 (note that study 5-6 have more)
 
+### Getting the demographic data
+
+```{r}
+pacman::p_load(tidyverse, stringr, purrr)
+#Load csv file
+DemData <- read.csv("DemographicData.csv", sep = ";", header = T)
+
+#Only danish data
+DemDan <- DemData %>% 
+    filter(Language == "Danish") %>% 
+    mutate(ID = 1:264)
+```
+
+
 ### Getting to the pitch data
 
 You have oh so many pitch files. What you want is a neater dataset, with one row per recording, including a bunch of meaningful descriptors of pitch. For instance, we should include "standard" descriptors: mean, standard deviation, range. Additionally, we should also include less standard, but more robust ones: e.g. median, iqr, mean absoluted deviation, coefficient of variation. The latter ones are more robust to outliers and non-normal distributions.
@@ -108,30 +122,133 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
-library(tidyverse)
+trial <- read.delim("Pitch/Study6D1S044T9.txt", sep = "\t", header =T)
+
+arti <- read.delim("Articulation.txt", sep = ",", header =T)
+
+file1 <- "Study6D1S044T9.txt"
+file2 <- "Study6D1S203T9.txt"
+
+str_extract(file1, "(S\\d\\d\\d|\\d\\d)")
+str_extract(file2, "S(\\d\\d\\d|\\d\\d)")
+
+
+sub(".*?T=(.*?);.*", "\\1", file1)
+
+
 
 read_pitch <- function(filename) {
     # load data
+    df <- read.delim(filename, sep = '\t', header = T)
     
-    # parse filename to extract study, diagnosis, subject and trial
+    # Parse file name to extract study, diagnosis, subject and trial
+    # Finding the pattern 'Study', selecting the pattern and the next character
+    Study <- str_extract(filename, 'Study.') %>% 
+        str_remove('Study') # Removing 'Study'
+    
+    # Finding the pattern 'D', selecting the pattern and the next character
+    Diagnosis <- str_extract(filename, 'D.') %>% 
+        str_remove('D') # Removing 'D'
+    
+    # Finding the pattern 'S with 2 or 3 digits after it' and selecting the pattern 
+    Subject <-
+        str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') %>% 
+        str_remove('S') # Removing 'S'
+    
+    # Finding the position of the first T in the file name
+    pos <- str_locate(filename, 'T')[1]
+    
+    # Finding the number of characters in the file name (to index the last character in the next step)
+    len_split <- length(strsplit(filename, '')[[1]])
+    
+    # Saving everything in the file name from the first T to the last character
+    Trial <- substr(filename, pos, len_split) 
+    
+    # Removing the part after trial
+    Trial <- ifelse(str_detect(Trial, '_') == T, 
+                    str_remove(Trial, '_f0.txt'), 
+                    str_remove(Trial, '.txt'))
     
     # extract pitch descriptors (mean, sd, iqr, etc)
+    mean <- mean(df$f0)
+    sd <- sd(df$f0)
+    iqr <- IQR(df$f0)
+    median <- median(df$f0)
     
     # combine all this data in one dataset
+    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    
     return(data)
 }
 
 # test it on just one file while writing the function
-test_data = read_pitch("Pitch/a_file_to_test.txt")
+test_data = read_pitch("Pitch/Study6D1S044T9.txt")
+
+# Function for adding 'Pitch/' to the file names 
+pastyp <- function(filename){
+    filename <- paste('Pitch/', filename, sep = '')
+    return(filename)
+}
+
 
 # when you've created a function that works, you can
-pitch_data = list.files(path = "Assignment3/data/Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
-    purrr::map_df(read_pitch)
+# pitch_data = list.files(path = "Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
+#     purrr::map_df(read_pitch)
+# 
+# 
+# write_csv(pitch_data, ...)
+# 
+# 
+# shopping_list <- c("apples x4", "bag of flour", "bag of sugar", "milk x2")
+# str_extract(shopping_list, "\\d")
+# str_extract(shopping_list, "[a-z]+")
+# str_extract(shopping_list, "[a-z]{1,4}")
+# str_extract(shopping_list, "\\b[a-z]{1,4}\\b")
+# 
+# str_extract_all(shopping_list, "[a-z]+")
+# str_extract_all(shopping_list, "\\b[a-z]+\\b")
+# str_extract_all(shopping_list, "\\d")
 
-write_csv(pitch_data, ...)
 
 ```
 
+```{r}
+
+# Loading the mf data YAYA
+pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list of file names
+    
+    lapply(pastyp) %>% # Adding 'Pitch/' to the file names
+    data.frame() %>%
+    t() %>% 
+    as.character() %>% 
+    t() %>% # Making the list into a data frame... I works this way - don't ask why..
+    purrr::map_df(read_pitch) %>% # Mapping the read_pitch function on the file names
+    t() %>% # Dunno, it has the wrong direction
+    data.frame() # Making it into a data frame
+
+# Fixing the column names
+colnames(pitch_data) <- c('Filename',
+                          'Study',
+                          'Diagnosis',
+                          'Subject',
+                          'Trial',
+                          'Mean',
+                          'SD',
+                          'IQR',
+                          'Median')
+
+# Dunno why the row names are weird, but now they are fixed 
+rownames(pitch_data) <- 1:nrow(pitch_data)
+
+# Loading more data, selecting only the Danish study
+Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
+    filter(Language == "Danish") %>% 
+    mutate(ID = 1:264)
+
+# Loading more data
+Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
+
+```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 

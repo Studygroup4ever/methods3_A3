@@ -123,24 +123,71 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
-library(tidyverse)
+pacman::p_load(tidyverse, stringr)
 
+Demo <- read.csv("DemographicData.csv", sep = ";", header = T)
+
+DemoDanish <- subset(Demo, Language == "Danish")
+
+DemoDanish$ID <- 1:264
+
+Arti <- read.delim("Articulation.txt", header = TRUE, sep = ",")
+
+Pitch <- 
+    for n in length(list)
+
+read.delim("Articulation.txt", header = TRUE, sep = ",")
+
+testPitch <-  read.delim("Pitch/Study5D1S26T2.txt", sep = "\t", header = T)
+
+f <- str_extract("Study5D1S26T2.txt", 'T(\\dT\\d|\\d)')
+
+#for(n in 1:length(list){...})
+
+# only study 1-4
 read_pitch <- function(filename) {
     # load data
+    df <- read.delim(filename, sep = "\t", header = T)
     
     # parse filename to extract study, diagnosis, subject and trial
+    #Study5D1S26T2
+    Study <- str_extract(filename, 'Study.')
+    Diagnosis <- str_extract(filename, 'D.')
+    Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
+    Trial <- str_extract(filename, 'T(\\dT\\d|\\d)')
     
     # extract pitch descriptors (mean, sd, iqr, etc)
     
+    
     # combine all this data in one dataset
-    return(data)
+    data <- c(f_name, Study, Diagnosis, Subject)
+     return(data)
+}
+# try lapply??
+```
+
+
+```{r}
+#Det jeg fik fra gruppen
+list <- list.files(path = "Pitch/",pattern = "*.txt")
+path <- "Pitch/"
+data_lists <- as.data.frame(NULL)
+
+for (file in 1:length(list)){
+    df <- read.delim(paste0(path, list[file]))
+    df$Study <- ""
+    df$Study <- str_extract(list[file], "\\d {6}") #for letters [a-z]
+    data_lists <- rbind(data_lists, df)
 }
 
+
 # test it on just one file while writing the function
-test_data = read_pitch("Pitch/a_file_to_test.txt")
+test_data = read_pitch("Pitch/Study5D1S26T2.txt")
+
+
 
 # when you've created a function that works, you can
-pitch_data = list.files(path = "Assignment3/data/Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
+pitch_data = list.files(path = "Desktop/EM3/methods3_A3/Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
     purrr::map_df(read_pitch)
 
 write_csv(pitch_data, ...)
