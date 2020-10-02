@@ -122,19 +122,39 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
-trial <- read.delim("Pitch/Study6D1S044T9.txt", sep = "\t", header =T)
+read_pitch <- function(filename) {
+    # load data
+    df <- read.delim(filename, sep = "\t", header = T)
+    
+    # parse filename to extract study, diagnosis, subject and trial
+    #Study5D1S26T2
+    Study <- str_extract(filename, 'Study.')
+    Diagnosis <- str_extract(filename, 'D.')
+    Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
+    Trial <- str_extract(filename, 'T(\\dT\\d|\\d)')
+    
+    # extract pitch descriptors (mean, sd, iqr, etc)
+    
+    
+    # combine all this data in one dataset
+    data <- c(filename, Study, Diagnosis, Subject)
+     return(data)
+}
+```
 
-arti <- read.delim("Articulation.txt", sep = ",", header =T)
 
-file1 <- "Study6D1S044T9.txt"
-file2 <- "Study6D1S203T9.txt"
+```{r}
 
-str_extract(file1, "(S\\d\\d\\d|\\d\\d)")
-str_extract(file2, "S(\\d\\d\\d|\\d\\d)")
+demo <- read.csv("DemographicData.csv", sep = ";")
+demo %>% filter(Diagnosis == "Control") 
+library(tidyverse)
 
+danish <- demo %>% filter(Language == "Danish") 
+danish %>% group_by(Diagnosis) %>%  summarise(age_count=n())
 
-sub(".*?T=(.*?);.*", "\\1", file1)
+danish$ID <- 1:264
 
+arti <- read.delim("Articulation.txt", sep =",")
 
 
 read_pitch <- function(filename) {
@@ -169,6 +189,10 @@ read_pitch <- function(filename) {
                     str_remove(Trial, '_f0.txt'), 
                     str_remove(Trial, '.txt'))
     
+    soundname <- ifelse(str_detect(filename, '_') == T, 
+                    str_remove(filename, '_f0.txt'), 
+                    str_remove(filename, '.txt')) %>%  str_remove('Pitch/')
+    
     # extract pitch descriptors (mean, sd, iqr, etc)
     mean <- mean(df$f0)
     sd <- sd(df$f0)
@@ -176,13 +200,10 @@ read_pitch <- function(filename) {
     median <- median(df$f0)
     
     # combine all this data in one dataset
-    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    data <- c(soundname, filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
     
     return(data)
 }
-
-# test it on just one file while writing the function
-test_data = read_pitch("Pitch/Study6D1S044T9.txt")
 
 # Function for adding 'Pitch/' to the file names 
 pastyp <- function(filename){
@@ -191,43 +212,23 @@ pastyp <- function(filename){
 }
 
 
-# when you've created a function that works, you can
-# pitch_data = list.files(path = "Pitch/",pattern = ".txt") %>% ## NB replace with your path to the files
-#     purrr::map_df(read_pitch)
-# 
-# 
-# write_csv(pitch_data, ...)
-# 
-# 
-# shopping_list <- c("apples x4", "bag of flour", "bag of sugar", "milk x2")
-# str_extract(shopping_list, "\\d")
-# str_extract(shopping_list, "[a-z]+")
-# str_extract(shopping_list, "[a-z]{1,4}")
-# str_extract(shopping_list, "\\b[a-z]{1,4}\\b")
-# 
-# str_extract_all(shopping_list, "[a-z]+")
-# str_extract_all(shopping_list, "\\b[a-z]+\\b")
-# str_extract_all(shopping_list, "\\d")
 
 
-```
 
-```{r}
+
 
 # Loading the mf data YAYA
 pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list of file names
-    
     lapply(pastyp) %>% # Adding 'Pitch/' to the file names
-    data.frame() %>%
-    t() %>% 
-    as.character() %>% 
-    t() %>% # Making the list into a data frame... I works this way - don't ask why..
+    data.frame() %>% # Making the list into a data frame... I works this way - don't ask why..
     purrr::map_df(read_pitch) %>% # Mapping the read_pitch function on the file names
     t() %>% # Dunno, it has the wrong direction
     data.frame() # Making it into a data frame
 
+pitch_data <- read_csv("pitch_data.csv")
+
 # Fixing the column names
-colnames(pitch_data) <- c('Filename',
+colnames(pitch_data) <- c('soundname', 'Filename',
                           'Study',
                           'Diagnosis',
                           'Subject',
@@ -248,7 +249,84 @@ Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>%
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
+?write.csv
+write.csv(pitch_data, 'pitch_data.csv')
+
+
 ```
+
+```{r}
+#setwd("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Portfolio 2/methods3_A3")
+getwd()
+pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list of file names
+    lapply(pastyp) %>% 
+    data.frame() %>% 
+    purrr::map_df(read_pitch) %>% 
+    t() %>% 
+    data.frame()
+
+
+setwd("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Portfolio 2/methods3_A3")
+getwd()
+pitch_data = list.files(path = "/Pitch", pattern = ".txt")
+t=purrr::map_df(pitch_data,read_pitch)
+map_df
+
+```
+
+```{r}
+
+# Loading the mf data YAYA
+pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list of file names
+    
+    lapply(pastyp) %>% # Adding 'Pitch/' to the file names
+    # data.frame() %>%
+    
+    as.character() %>% 
+    as.tibble() %>% 
+
+
+    t() %>% # Making the list into a data frame... I works this way - don't ask why..
+    purrr::map_df(read_pitch) 
+    
+    %>% # Mapping the read_pitch function on the file names
+    t() %>% # Dunno, it has the wrong direction
+    data.frame() # Making it into a data frame
+
+# Fixing the column names
+colnames(pitch_data) <- c('Filename',
+                          'Study',
+                          'Diagnosis',
+                          'Subject',
+                          'Trial',
+                          'Mean',
+                          'SD',
+                          'IQR',
+                          'Median')
+
+# Dunno why the row names are weird, but now they are fixed 
+rownames(pitch_data) <- 1:nrow(pitch_data)
+
+```
+
+```{r}
+###OKAY SCREW THAT SHIZZNIT, WE STEAL THE CSV FILE FROM THE REPO#####
+
+pitch_data <- read_csv("pitch_data.csv")
+danish_pitch <- read_csv("pitch_data_danish_only.csv")
+
+# Loading more data, selecting only the Danish study
+Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
+    filter(Language == "Danish") %>% 
+    mutate(ID = 1:264)
+
+# Loading more data
+Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
+
+
+
+```
+
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 
@@ -256,6 +334,7 @@ Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 # Let's start with the demographic and clinical data
 
 # then duration data
+
 
 # Finally the pitch data
 
