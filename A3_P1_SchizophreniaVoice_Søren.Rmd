@@ -146,6 +146,11 @@ read_pitch <- function(filename) {
                     str_remove(Trial, '_f0.txt'), 
                     str_remove(Trial, '.txt'))
     
+    soundname <- ifelse(str_detect(filename, '_') == T, 
+                    str_remove(filename, '_f0.txt'), 
+                    str_remove(filename, '.txt')) %>% 
+        str_remove('Pitch/')
+    
     # extract pitch descriptors (mean, sd, iqr, etc)
     mean <- mean(df$f0)
     sd <- sd(df$f0)
@@ -153,7 +158,7 @@ read_pitch <- function(filename) {
     median <- median(df$f0)
     
     # combine all this data in one dataset
-    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    data <- c(soundname, filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
     
     return(data)
 }
@@ -176,7 +181,8 @@ pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list
     data.frame() # Making it into a data frame
 
 # Fixing the column names
-colnames(pitch_data) <- c('Filename',
+colnames(pitch_data) <- c('soundname', 
+                         'Filename',
                           'Study',
                           'Diagnosis',
                           'Subject',
@@ -197,16 +203,17 @@ Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>%
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
+?write.csv
+write.csv(pitch_data, 'pitch_data.csv')
 ```
-
-
-
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 
 ```{r}
 # Let's start with the demographic and clinical data
+pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname')
 
+?merge()
 # then duration data
 
 # Finally the pitch data
