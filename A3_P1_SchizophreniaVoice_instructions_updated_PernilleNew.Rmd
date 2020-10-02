@@ -132,7 +132,9 @@ read_pitch <- function(filename) {
     Trial <- ifelse(str_detect(Trial, '_') == T, #if it has an underscore, remove _f0.txt, otherwise just .txt
                     str_remove(Trial, '_f0.txt'), 
                     str_remove(Trial, '.txt'))
-    
+    soundname <- ifelse(str_detect(filename, '_') == T,
+                    str_remove(filename, '_f0.txt'), 
+                    str_remove(filename, '.txt')) %>% str_remove('Pitch/')
     # extract pitch descriptors (mean, sd, iqr, etc)
     mean = mean(df$f0)
     sd = sd(df$f0)
@@ -140,7 +142,7 @@ read_pitch <- function(filename) {
     median = median(df$f0)
     
     # combine all this data in one dataset
-    data = c(filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
+    data = c(soundname,filename, Study, Diagnosis, Subject, Trial, mean, sd, iqr, median)
     #data <- data %>% as.data.frame()
     #data <- data %>% t()
     #colnames(data) <- c("filename", "Study", "Diagnosis", "Subject", "Trial", "mean", "sd", "iqr", "median" )
@@ -148,7 +150,7 @@ read_pitch <- function(filename) {
 }
 
 # test it on just one file while writing the function
-test_data = read_pitch('Pitch/Study1D0S101T1_f0.txt')
+#test_data = read_pitch('Pitch/Study1D0S101T1_f0.txt')
 
 # adding Pitch to the filenames (in front)
 pastyp <- function(filename){
@@ -157,9 +159,8 @@ pastyp <- function(filename){
 }
 ```
 
-
+Study6D0S001T1 participant 001
 ```{r}
-
 setwd('/Users/pernillebrams/Desktop/EM3/methods3_A3')
 
 # my list
@@ -171,10 +172,11 @@ pitch_data = list.files(path = "Pitch/",pattern = ".txt") %>%
     data.frame()
 
 # Fixing the column names
-colnames(pitch_data) <- c('Filename',
+colnames(pitch_data) <- c('soundname',
+                          'Filename',
                           'Study',
-                          'Diagnosis',
-                          'Subject',
+                          'Diagnosis', # 1 = skizo, 0 = control
+                          'Participant',
                           'Trial',
                           'Mean',
                           'SD',
@@ -184,34 +186,39 @@ colnames(pitch_data) <- c('Filename',
 # Fixing rownames
 rownames(pitch_data) <- 1:nrow(pitch_data) #giving the rows numbers from 1 to total number of rows of pitch_dataframe
 
+# Filter study 1-4
+pitch_data <- pitch_data %>% 
+    filter(Study <= 4)
 
-write_csv(pitch_data, ...)
-
+#write_csv(pitch_data, "pitch_data_danish_only.csv")
 ```
+
 
 ```{r}
+# Loading Demographic
+# Loading more data, selecting only the Danish study
+Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
+    filter(Language == "Danish")
+    
+# Sort diagnosis
+Dem_data$Diagnosis <- sort(Dem_data$Diagnosis)
 
-# for (i in 1:length(pitch_data)) {
-#     small = read.table(pitch_data[i], header = T)
-#     small$filename = str_sub(pitch_data[i])
-#     i = read_pitch(i)
-#     df_big = rbind(small,df_big)
-#     print(i)
-# }
+# Give them new ID's
+Dem_data$ID <- 1:264 
 
-# store = NULL
-# for (i in 1:2) {
-#         lille = read.table(list[i], header = T)
-#         lille$dirname = str_sub(list[i])
-#         lille$study = str_sub(lille$dirname,8,13)
-#         lille$diagnosis = str_sub(lille$dirname,14,15)
-#         lille$subject = str_sub(lille$dirname,16,17)
-#         lille$trial = str_sub(lille$dirname,14,15)
-#         store = rbind(store,lille)
-#         print(i)
-#         
+        #so Control is
+which(Dem_data$Diagnosis == 'Control') #from 1-130
+which(Dem_data$Diagnosis == 'Schizophrenia') #from 131-264
+
+####### GATHER THOSE TWO IN THE PIPES ####
 ```
 
+
+```{r}
+# Loading Articulation data
+Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
+
+```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 
@@ -223,7 +230,8 @@ write_csv(pitch_data, ...)
 # Finally the pitch data
 
 # Now we merge them
-
+# To merge, we want to add 1000 for Schizoprenia:
+Dem_data$Participant
 # Now we save them
 
 ```
