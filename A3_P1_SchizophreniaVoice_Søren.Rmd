@@ -129,7 +129,7 @@ read_pitch <- function(filename) {
     
     # Finding the pattern 'S with 2 or 3 digits after it' and selecting the pattern 
     Subject <-
-        str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') %>% 
+        str_extract(filename, 'S(\\d\\d\\d|\\d\\d|\\d)') %>% 
         str_remove('S') # Removing 'S'
     
     # Finding the position of the first T in the file name
@@ -182,10 +182,10 @@ pitch_data = list.files(path = "Pitch/", pattern = ".txt") %>%  # Getting a list
 
 # Fixing the column names
 colnames(pitch_data) <- c('soundname', 
-                         'Filename',
+                          'Filename',
                           'Study',
                           'Diagnosis',
-                          'Subject',
+                          'Participant',
                           'Trial',
                           'Mean',
                           'SD',
@@ -197,31 +197,46 @@ rownames(pitch_data) <- 1:nrow(pitch_data)
 
 # Loading more data, selecting only the Danish study
 Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
-    filter(Language == "Danish") %>% 
-    mutate(ID = 1:264)
+    filter(Language == "Danish") 
+
+# %>% 
+#     mutate(ID = 1:264)
 
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
-?write.csv
-write.csv(pitch_data, 'pitch_data.csv')
+#write.csv(pitch_data, 'pitch_data.csv')
 ```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 
 ```{r}
 # Let's start with the demographic and clinical data
-pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname')
 
-?merge()
+
 # then duration data
+Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Control",
+                               as.numeric(Dem_data$Participant),
+                               as.numeric(Dem_data$Participant)+1000)
+pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "0",
+                                 as.numeric(pitch_data$Participant),
+                                 as.numeric(pitch_data$Participant)+1000)
+
+pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname') 
+
+
+pitch_arti$Participant <- as.factor(pitch_arti$Participant)
+Dem_data$Participant <- as.factor(Dem_data$Participant)
+
+df <- merge(pitch_arti, Dem_data, by = "Participant") %>% 
+    filter(Study.x < 5 & Study.y <5) %>% 
+    na.omit()
+
+unique(df$Study.x == df$Study.y)
+
 
 # Finally the pitch data
-
-# Now we merge them
-
-# Now we save them
-
+#View(df)
 ```
 
 ## Now we need to describe our sample
