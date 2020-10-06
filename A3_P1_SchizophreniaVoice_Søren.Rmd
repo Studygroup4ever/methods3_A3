@@ -109,7 +109,7 @@ See placeholder code here for help.
 ```{r}
 library(pacman)
 
-p_load(purrr, tidyverse, reshape2)
+p_load(purrr, tidyverse, reshape2, lme4, car)
 ```
 
 
@@ -228,16 +228,15 @@ pitch_arti$Participant <- as.factor(pitch_arti$Participant)
 Dem_data$Participant <- as.factor(Dem_data$Participant)
 
 df <- merge(pitch_arti, Dem_data, by = "Participant") %>% 
-    filter(Study.x < 5 & Study.y <5) %>% 
-    na.omit()
+    filter(Study.x < 5 & Study.y < 5)
 
-unique(df$Study.x == df$Study.y)
+#unique(df$Study.x == df$Study.y)
 
 
 # Finally the pitch data
 #View(df)
 
-#write.csv(df, 'pitch_data_filtered.csv')
+#write.csv(df, 'pitch_data_withNA.csv')
 ```
 
 ## Now we need to describe our sample
@@ -248,25 +247,64 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
-df <- read.csv('sounddata.csv')
+df <- read.csv('pitch_data_withNA.csv')
+
+df <- df %>% select(
+    c(
+        Diagnosis.x,
+        Diagnosis.y,
+        Participant,
+        SANS,
+        SAPS,
+        Gender,
+        Study.y,
+        Trial,
+        npause,
+        dur..s.,
+        phonationtime..s.,
+        IQR,
+        speechrate..nsyll.dur.,
+        Age
+    )
+) %>%
+    na.omit()
+
+```
+
+
+
+```{r}
 
 df %>% group_by(Diagnosis.y) %>% summarize(n())
 
 df %>% group_by(Gender) %>% summarize(n())
 
+df %>% group_by(Participant) %>% slice(1) %>% group_by(Diagnosis.y) %>% summarize(mean(Age))
+
+df %>% group_by(Diagnosis.x) %>% summarize(mean(SAPS))
+
+df %>% group_by(Diagnosis.x) %>% summarize(mean(SANS))
+
+
+
 df %>% group_by(Study.y, Gender) %>% summarize(n())
+
+df %>% group_by(Study.y, Diagnosis.x) %>% summarize(n())
+
+df %>% group_by(Gender, Diagnosis.x) %>% summarize(n())
 
 df %>% group_by(Study.y) %>% summarize(n())
 
-?summarize()
+df %>% group_by(Trial) %>% summarize(n())
 
+df %>% select(c(Study.y, Diagnosis.x, SANS)) %>% na.omit() %>% group_by(Study.y, Diagnosis.x) %>% summarize(mean(SANS))
 
 ```
 
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
 - pitch variability (IQR) (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09)
-- proportion of spoken time (phonationtime..s.) (lower, Hedges' g: -1.26, 95% CIs: -2.26, 0.25)
+- proportion of spoken time (phonationtime..s. / dur..s. ) (lower, Hedges' g: -1.26, 95% CIs: -2.26, 0.25)
 - speech rate (speechrate..nsyl.dur) (slower, Hedges' g: -0.75, 95% CIs: -1.51, 0.04)
 - pause duration ((dur..s. - phonationtime..s.)/npause) (longer, Hedges' g: 1.89, 95% CIs: 0.72, 3.21). (Duration - Spoken Duration) / PauseN
 
@@ -281,21 +319,83 @@ N.N.N.B. If you want to estimate the studies separately, you can try this syntax
 - Bonus points: cross-validate the models and report the betas and standard errors from all rounds to get an idea of how robust the estimates are. 
 
 ```{r}
-df <- read.csv('sounddata.csv')
-
+#df <- read.csv('sounddata.csv')
 df <- df %>% 
     mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
 
-df$pause_dur <- ifelse(df$pause_dur == Inf, 0, df$pause_dur)
+df$pause_dur <- ifelse(df$pause_dur == Inf, 0, df$pause_dur) %>% as.numeric()
 
    set.seed(1)
    x <- runif(7)
 
-   # Manually scaling
-   (x - mean(x)) / sd(x)
+df <- df %>% 
+    mutate(pause_dur_scaled = scale(pause_dur)) %>% 
+    mutate(IQR_scaled = scale(IQR)) %>% 
+    mutate(SpeechRate_scaled = scale(speechrate..nsyll.dur.)) %>% 
+    mutate(ProportionSpokenTime_scaled = scale(phonationtime..s./dur..s.)) 
 
-   scale(x)
+df$Diagnosis.x <- as.factor(df$Diagnosis.x)
+
+df_sub <- df %>% select(c(Diagnosis.x, pause_dur_scaled, Participant)) %>% na.omit()
 ```
+
+```{r}
+lm1 <- lmer(data = df, IQR_scaled ~ Diagnosis.x + (1|Participant))
+summary(lm1)
+
+```
+
+
+
+
+```{r}
+m1 <- glm(data = df, Diagnosis.x ~ IQR_scaled, family = 'binomial')
+summary(m1)
+
+m2 <- glm(data = df, Diagnosis.x ~ ProportionSpokenTime_scaled, family = 'binomial')
+summary(m2)
+
+m3 <- glm(data = df, Diagnosis.x ~ SpeechRate_scaled, family = 'binomial')
+summary(m3)
+
+m4 <- glm(data = df, Diagnosis.x ~ pause_dur_scaled, family = 'binomial')
+summary(m4)
+
+pitch_vari_model <- glmer(data = df, 
+                          Diagnosis.x ~ IQR_scaled + (1 | Participant), 
+                          family = 'binomial')
+summary(pitch_vari_model)
+
+SpokenTime_model <- glmer(data = df, 
+                          Diagnosis.x ~ ProportionSpokenTime_scaled + (1 | Participant), 
+                          family = 'binomial')
+summary(SpokenTime_model)
+
+SpeechRate_model <- glmer(data = df, Diagnosis.x ~ SpeechRate_scaled + (1 | Participant), 
+                          family = 'binomial')
+summary(SpokenTime_model)
+
+pause_dur_model <- glmer(data = df, Diagnosis.x ~ pause_dur_scaled  + (1 | Participant), 
+                          family = 'binomial')
+summary(pause_dur_model)
+
+```
+
+```{r}
+max_model <- glmer(data = df, 
+                   Diagnosis.x ~ IQR_scaled +
+                       ProportionSpokenTime_scaled + 
+                       SpeechRate_scaled + 
+                       pause_dur_scaled +
+                       (1|Participant),
+                   family = 'binomial'
+                   )
+
+summary(max_model)
+
+vif(max_model)
+```
+
 
 In order to avoid collinearity, we constructed a heatmap of the correlations between the variables.
 ```{r}
@@ -325,6 +425,56 @@ heat_df <- df %>%
 colnames(heat_df)[7] <- 'AtrPhon'
 colnames(heat_df)[6] <- 'SpeechRate'
 colnames(heat_df)[8] <- 'ASD_Speak'
+```
+
+
+```{r}
+heat_df2 <- heat_df %>% select(c(IQR_scaled, SpokenTime_scaled, SpeechRate_scaled, pause_dur_scaled, Diagnosis.x, Participant, Trial))
+
+heatmap <- round(cor(heat_df2), 2) %>%
+    reorder_cormat() %>%
+    get_upper_tri() %>%
+    melt(na.rm = T) %>%
+    ggplot(aes(Var2, Var1, fill = value)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient2(
+        low = "blue",
+        high = "red",
+        mid = "white",
+        midpoint = 0,
+        limit = c(-1, 1),
+        space = "Lab",
+        name = "Pearson\nCorrelation"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(
+        angle = 45,
+        vjust = 1,
+        size = 10,
+        hjust = 1
+    )) +
+    coord_fixed() + geom_text(aes(Var2, Var1, label = value),
+                              color = "black",
+                              size = 3) +
+    theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        legend.justification = c(1, 0),
+        legend.position = c(0.6, 0.7),
+        legend.direction = "horizontal"
+    ) +
+    guides(fill = guide_colorbar(
+        barwidth = 7,
+        barheight = 1,
+        title.position = "top",
+        title.hjust = 0.5
+    ))
+
+heatmap
 ```
 
 
