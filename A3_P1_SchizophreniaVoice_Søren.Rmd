@@ -109,7 +109,7 @@ See placeholder code here for help.
 ```{r}
 library(pacman)
 
-p_load(purrr, tidyverse)
+p_load(purrr, tidyverse, reshape2)
 ```
 
 
@@ -237,28 +237,38 @@ unique(df$Study.x == df$Study.y)
 # Finally the pitch data
 #View(df)
 
-write.csv(df, 'pitch_data_filtered.csv')
+#write.csv(df, 'pitch_data_filtered.csv')
 ```
 
 ## Now we need to describe our sample
 
 First look at the missing data: we should exclude all recordings for which we do not have complete data.
-Then count the participants and recordinsgs by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
+Then count the participants and recordings by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
 Finally, do the same by diagnosis and study, to assess systematic differences in studies.
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
-df <- read.csv('pitch_data_danish_only.csv')
+df <- read.csv('sounddata.csv')
+
+df %>% group_by(Diagnosis.y) %>% summarize(n())
+
+df %>% group_by(Gender) %>% summarize(n())
+
+df %>% group_by(Study.y, Gender) %>% summarize(n())
+
+df %>% group_by(Study.y) %>% summarize(n())
+
+?summarize()
 
 
 ```
 
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
-- pitch variability (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09)
-- proportion of spoken time (lower, Hedges' g: -1.26, 95% CIs: -2.26, 0.25)
-- speech rate (slower, Hedges' g: -0.75, 95% CIs: -1.51, 0.04)
-- pause duration (longer, Hedges' g: 1.89, 95% CIs: 0.72, 3.21). (Duration - Spoken Duration) / PauseN
+- pitch variability (IQR) (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09)
+- proportion of spoken time (phonationtime..s.) (lower, Hedges' g: -1.26, 95% CIs: -2.26, 0.25)
+- speech rate (speechrate..nsyl.dur) (slower, Hedges' g: -0.75, 95% CIs: -1.51, 0.04)
+- pause duration ((dur..s. - phonationtime..s.)/npause) (longer, Hedges' g: 1.89, 95% CIs: 0.72, 3.21). (Duration - Spoken Duration) / PauseN
 
 We need therefore to set up 4 models to see how well our results compare to the meta-analytic findings (Feel free of course to test more features)
 Describe the acoustic profile of a schizophrenic voice
@@ -271,6 +281,13 @@ N.N.N.B. If you want to estimate the studies separately, you can try this syntax
 - Bonus points: cross-validate the models and report the betas and standard errors from all rounds to get an idea of how robust the estimates are. 
 
 ```{r}
+df <- read.csv('sounddata.csv')
+
+df <- df %>% 
+    mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
+
+df$pause_dur <- ifelse(df$pause_dur == Inf, 0, df$pause_dur)
+
    set.seed(1)
    x <- runif(7)
 
@@ -279,6 +296,87 @@ N.N.N.B. If you want to estimate the studies separately, you can try this syntax
 
    scale(x)
 ```
+
+In order to avoid collinearity, we constructed a heatmap of the correlations between the variables.
+```{r}
+# Defining the functions needed for the heatmap
+# Use correlation between variables as distance
+reorder_cormat <- function(cormat) {
+  dd <- as.dist((1 - cormat) / 2)
+  hc <- hclust(dd)
+  cormat <- cormat[hc$order, hc$order]
+  }
+
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat) {
+  cormat[lower.tri(cormat)] <- NA
+  return(cormat)
+  }
+```
+
+```{r}
+heat_df <- df %>% 
+    select(-c(soundname, Filename, Study.y, Language, Diagnosis.y, X)) %>%
+    na.omit() %>% 
+    mutate(Trial = as.numeric(as.factor(Trial))) %>% 
+    mutate(Diagnosis.x = as.numeric(as.factor(Diagnosis.x))) %>% 
+    mutate(Gender = as.numeric(as.factor(Gender)))
+
+colnames(heat_df)[7] <- 'AtrPhon'
+colnames(heat_df)[6] <- 'SpeechRate'
+colnames(heat_df)[8] <- 'ASD_Speak'
+```
+
+
+
+```{r}
+#Building heatmap of correlations
+heatmap <- round(cor(heat_df), 2) %>%
+    reorder_cormat() %>%
+    get_upper_tri() %>%
+    melt(na.rm = T) %>%
+    ggplot(aes(Var2, Var1, fill = value)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient2(
+        low = "blue",
+        high = "red",
+        mid = "white",
+        midpoint = 0,
+        limit = c(-1, 1),
+        space = "Lab",
+        name = "Pearson\nCorrelation"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(
+        angle = 45,
+        vjust = 1,
+        size = 10,
+        hjust = 1
+    )) +
+    coord_fixed() + geom_text(aes(Var2, Var1, label = value),
+                              color = "black",
+                              size = 3) +
+    theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        legend.justification = c(1, 0),
+        legend.position = c(0.6, 0.7),
+        legend.direction = "horizontal"
+    ) +
+    guides(fill = guide_colorbar(
+        barwidth = 7,
+        barheight = 1,
+        title.position = "top",
+        title.hjust = 0.5
+    ))
+
+heatmap
+```
+
 
 ## N.B. Remember to save the acoustic features of voice in a separate file, so to be able to load them next time
 
@@ -289,7 +387,6 @@ Part 1 - Can we find a difference in acoustic features in schizophrenia?
 
 1) Describe your sample 
 number of studies, number of participants, age, gender, clinical and cognitive features of the two groups. Furthemore, critically assess whether the groups (schizophrenia and controls) are balanced. N.B. you need to take studies into account.
-
 
 2) Describe the acoustic profile of a schizophrenic voice: which features are different?
 E.g. People with schizophrenia tend to have high-pitched voice, and present bigger swings in their prosody than controls. N.B. look also at effect sizes. How do these findings relate to the meta-analytic findings?
