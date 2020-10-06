@@ -109,7 +109,7 @@ See placeholder code here for help.
 ```{r}
 library(pacman)
 
-p_load(purrr, tidyverse, reshape2, lme4, car)
+p_load(purrr, tidyverse, reshape2, lme4, car, effsize)
 ```
 
 
@@ -195,23 +195,39 @@ colnames(pitch_data) <- c('soundname',
 # Dunno why the row names are weird, but now they are fixed 
 rownames(pitch_data) <- 1:nrow(pitch_data)
 
+# Fixing classes
+pitch_data$Mean <- as.numeric(pitch_data$Mean)
+pitch_data$IQR <- as.numeric(pitch_data$IQR)
+pitch_data$Median <- as.numeric(pitch_data$Median)
+pitch_data$SD <- as.numeric(pitch_data$SD)
+pitch_data$Participant <- as.numeric(pitch_data$Participant)
+pitch_data$Study <- as.numeric(pitch_data$Study)
+
+pitch_data$Diagnosis <- as.factor(pitch_data$Diagnosis)
+
 # Loading more data, selecting only the Danish study
 Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
     filter(Language == "Danish") 
 
-# %>% 
-#     mutate(ID = 1:264)
+# Fixing classes
+Dem_data$Study <- as.numeric(Dem_data$Study)
+
+Dem_data$Gender <- as.factor(Dem_data$Gender)
+Dem_data$Diagnosis <- as.factor(Dem_data$Diagnosis)
 
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
+# Might be problematic
+#Arti_data$ASD..speakingtime.nsyll. <- as.numeric(Arti_data$ASD..speakingtime.nsyll.)
+
+pitch_data %>% group_by(Diagnosis) %>% summarise(mean(Mean))
 ```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 
 ```{r}
 # Let's start with the demographic and clinical data
-
 
 # then duration data
 Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Control",
@@ -221,7 +237,7 @@ pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "0",
                                  as.numeric(pitch_data$Participant),
                                  as.numeric(pitch_data$Participant)+1000)
 
-pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname') 
+pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname')
 
 
 pitch_arti$Participant <- as.factor(pitch_arti$Participant)
@@ -247,7 +263,7 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
-df <- read.csv('pitch_data_withNA.csv')
+#df <- read.csv('pitch_data_withNA.csv')
 
 df <- df %>% select(
     c(
@@ -264,40 +280,60 @@ df <- df %>% select(
         phonationtime..s.,
         IQR,
         speechrate..nsyll.dur.,
-        Age
+        Age,
+        Mean
     )
 ) %>%
     na.omit()
 
-```
+map1 <- df$dur..s. == df$phonationtime..s. 
+map2 <- df$npause == 0
 
+df$npause <- ifelse(map1 == map2, df$npause, NA)
+
+df <- na.omit(df)
+
+df <- df %>% 
+    mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
+
+df$pause_dur <- ifelse(df$npause == 0, 0, df$pause_dur) %>% as.numeric()
+
+df <- df %>% 
+    mutate(pause_dur_scaled = scale(pause_dur)) %>% 
+    mutate(IQR_scaled = scale(IQR)) %>% 
+    mutate(SpeechRate_scaled = scale(speechrate..nsyll.dur.)) %>% 
+    mutate(ProportionSpokenTime_scaled = scale(phonationtime..s./dur..s.)) %>% 
+    mutate(SAPS_scaled = scale(SAPS)) %>% 
+    mutate(Mean_scaled = scale(Mean))
+
+df$Diagnosis.x <- as.factor(df$Diagnosis.x)
+
+df_sub <- df %>% 
+    select(c(Diagnosis.x, pause_dur_scaled, Participant)) %>% 
+    na.omit()
+```
 
 
 ```{r}
 
-df %>% group_by(Diagnosis.y) %>% summarize(n())
+df %>% group_by(Diagnosis.x) %>% summarize(n())
+df %>% group_by(Diagnosis.x) %>% summarize(mean(SAPS))
+df %>% group_by(Diagnosis.x) %>% summarize(mean(SANS))
+
+df %>% group_by(Diagnosis.x, Gender) %>% summarize(n())
 
 df %>% group_by(Gender) %>% summarize(n())
 
+df %>% group_by(Participant) %>% slice(1) %>% group_by(Gender) %>% summarize(mean(Age))
 df %>% group_by(Participant) %>% slice(1) %>% group_by(Diagnosis.y) %>% summarize(mean(Age))
 
-df %>% group_by(Diagnosis.x) %>% summarize(mean(SAPS))
-
-df %>% group_by(Diagnosis.x) %>% summarize(mean(SANS))
-
-
-
-df %>% group_by(Study.y, Gender) %>% summarize(n())
-
-df %>% group_by(Study.y, Diagnosis.x) %>% summarize(n())
-
-df %>% group_by(Gender, Diagnosis.x) %>% summarize(n())
-
 df %>% group_by(Study.y) %>% summarize(n())
+df %>% group_by(Study.y) %>% summarize(mean(SANS))
+df %>% group_by(Study.y) %>% summarize(mean(SAPS))
+df %>% group_by(Study.y) %>% summarize(mean(Age))
 
-df %>% group_by(Trial) %>% summarize(n())
-
-df %>% select(c(Study.y, Diagnosis.x, SANS)) %>% na.omit() %>% group_by(Study.y, Diagnosis.x) %>% summarize(mean(SANS))
+df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SAPS))
+df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SANS))
 
 ```
 
@@ -319,25 +355,19 @@ N.N.N.B. If you want to estimate the studies separately, you can try this syntax
 - Bonus points: cross-validate the models and report the betas and standard errors from all rounds to get an idea of how robust the estimates are. 
 
 ```{r}
-#df <- read.csv('sounddata.csv')
-df <- df %>% 
-    mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
+df %>% group_by(Diagnosis.y) %>% summarize(mean(Mean_scaled))
+df %>% group_by(Diagnosis.y) %>% summarize(mean(Mean))
+df %>% group_by(Diagnosis.y) %>% summarize(median(Mean))
 
-df$pause_dur <- ifelse(df$pause_dur == Inf, 0, df$pause_dur) %>% as.numeric()
+df %>% group_by(Diagnosis.) %>% summarize(mean(IQR))
 
-   set.seed(1)
-   x <- runif(7)
 
-df <- df %>% 
-    mutate(pause_dur_scaled = scale(pause_dur)) %>% 
-    mutate(IQR_scaled = scale(IQR)) %>% 
-    mutate(SpeechRate_scaled = scale(speechrate..nsyll.dur.)) %>% 
-    mutate(ProportionSpokenTime_scaled = scale(phonationtime..s./dur..s.)) 
 
-df$Diagnosis.x <- as.factor(df$Diagnosis.x)
 
-df_sub <- df %>% select(c(Diagnosis.x, pause_dur_scaled, Participant)) %>% na.omit()
 ```
+
+
+
 
 ```{r}
 lm1 <- lmer(data = df, IQR_scaled ~ Diagnosis.x + (1|Participant))
@@ -352,31 +382,52 @@ summary(lm1)
 m1 <- glm(data = df, Diagnosis.x ~ IQR_scaled, family = 'binomial')
 summary(m1)
 
-m2 <- glm(data = df, Diagnosis.x ~ ProportionSpokenTime_scaled, family = 'binomial')
+m2 <-
+    glm(data = df,
+        Diagnosis.x ~ ProportionSpokenTime_scaled,
+        family = 'binomial')
 summary(m2)
 
-m3 <- glm(data = df, Diagnosis.x ~ SpeechRate_scaled, family = 'binomial')
+m3 <-
+    glm(data = df,
+        Diagnosis.x ~ SpeechRate_scaled,
+        family = 'binomial')
 summary(m3)
 
-m4 <- glm(data = df, Diagnosis.x ~ pause_dur_scaled, family = 'binomial')
+m4 <-
+    glm(data = df,
+        Diagnosis.x ~ pause_dur_scaled,
+        family = 'binomial')
 summary(m4)
 
-pitch_vari_model <- glmer(data = df, 
-                          Diagnosis.x ~ IQR_scaled + (1 | Participant), 
+
+pitch_vari_model <- glmer(data = df,
+                          Diagnosis.x ~ IQR_scaled + (1 |
+                                                          Participant),
                           family = 'binomial')
 summary(pitch_vari_model)
+lmer()
 
-SpokenTime_model <- glmer(data = df, 
-                          Diagnosis.x ~ ProportionSpokenTime_scaled + (1 | Participant), 
-                          family = 'binomial')
+
+SpokenTime_model <- glmer(
+    data = df,
+    Diagnosis.x ~ ProportionSpokenTime_scaled + (1 | Participant),
+    family = 'binomial'
+)
 summary(SpokenTime_model)
 
-SpeechRate_model <- glmer(data = df, Diagnosis.x ~ SpeechRate_scaled + (1 | Participant), 
-                          family = 'binomial')
-summary(SpokenTime_model)
+SpeechRate_model <-
+    glmer(
+        data = df,
+        Diagnosis.x ~ SpeechRate_scaled + (1 | Participant),
+        family = 'binomial'
+    )
+summary(SpeechRate_model)
 
-pause_dur_model <- glmer(data = df, Diagnosis.x ~ pause_dur_scaled  + (1 | Participant), 
-                          family = 'binomial')
+pause_dur_model <-
+    glmer(data = df,
+          Diagnosis.x ~ pause_dur_scaled  + (1 | Participant),
+          family = 'binomial')
 summary(pause_dur_model)
 
 ```
@@ -388,7 +439,8 @@ max_model <- glmer(data = df,
                        SpeechRate_scaled + 
                        pause_dur_scaled +
                        (1|Participant),
-                   family = 'binomial'
+                   family = 'binomial',
+                   control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE)
                    )
 
 summary(max_model)
@@ -481,6 +533,12 @@ heatmap
 
 ```{r}
 #Building heatmap of correlations
+heat_df <- df %>% 
+    select(-c(Diagnosis.y)) %>% 
+    mutate(Trial = as.numeric(as.factor(Trial))) %>% 
+    mutate(Diagnosis.x = as.numeric(as.factor(Diagnosis.x))) %>% 
+    mutate(Gender = as.numeric(as.factor(Gender)))
+
 heatmap <- round(cor(heat_df), 2) %>%
     reorder_cormat() %>%
     get_upper_tri() %>%
