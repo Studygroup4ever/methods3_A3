@@ -1,6 +1,6 @@
 ---
 title: "Final A3P1"
-author: "Søren Orm Hansen"
+author: "Klara, Pernille, Søren, Clement & Julia"
 date: "10/7/2020"
 output: html_document
 ---
@@ -474,12 +474,16 @@ m_pitch <-
         family = "binomial",
         control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
 
+summary(m_pitch)
+
 # Predicting diagnosis by proportion of spoken time including random intercepts for participants
 m_pst <- 
   glmer(Diagnosis.y ~ ProportionSpokenTime_scaled + (1 | Participant),
         df,
        family = "binomial",
         control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+summary(m_pst)
 
 # Predicting diagnosis by speech rate including random intercepts for participants
 m_sr <-
@@ -489,6 +493,8 @@ m_sr <-
        control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
       )
 
+summary(m_sr)
+
 # Predicting diagnosis by pause duration including random intercepts for participants
 m_pd <-
   glmer(Diagnosis.y ~ pause_dur_scaled + (1 | Participant),
@@ -496,6 +502,8 @@ m_pd <-
         family = "binomial",
         control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
        )
+
+summary(m_pd)
 
 # Predicting diagnosis by pause duration and IQR including random intercepts for participants
 m_max1 <-
