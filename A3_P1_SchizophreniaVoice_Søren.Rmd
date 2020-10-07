@@ -221,7 +221,7 @@ Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 # Might be problematic
 #Arti_data$ASD..speakingtime.nsyll. <- as.numeric(Arti_data$ASD..speakingtime.nsyll.)
 
-pitch_data %>% group_by(Diagnosis) %>% summarise(mean(Mean))
+pitch_data %>% group_by(Diagnosis) %>% summarise(min(Mean))
 ```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
@@ -237,6 +237,7 @@ pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "0",
                                  as.numeric(pitch_data$Participant),
                                  as.numeric(pitch_data$Participant)+1000)
 
+
 pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname')
 
 
@@ -251,8 +252,6 @@ df <- merge(pitch_arti, Dem_data, by = "Participant") %>%
 
 # Finally the pitch data
 #View(df)
-
-#write.csv(df, 'pitch_data_withNA.csv')
 ```
 
 ## Now we need to describe our sample
@@ -263,8 +262,6 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
-#df <- read.csv('pitch_data_withNA.csv')
-
 df <- df %>% select(
     c(
         Diagnosis.x,
@@ -291,9 +288,7 @@ map2 <- df$npause == 0
 
 df$npause <- ifelse(map1 == map2, df$npause, NA)
 
-df <- na.omit(df)
-
-df <- df %>% 
+df <- df %>% na.omit() %>%  
     mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
 
 df$pause_dur <- ifelse(df$npause == 0, 0, df$pause_dur) %>% as.numeric()
@@ -311,7 +306,36 @@ df$Diagnosis.x <- as.factor(df$Diagnosis.x)
 df_sub <- df %>% 
     select(c(Diagnosis.x, pause_dur_scaled, Participant)) %>% 
     na.omit()
+
+write.csv(df, 'npause_fixed.csv')
 ```
+
+```{r}
+df <- read.csv('npause_fixed.csv')
+```
+
+```{r}
+df %>% ggplot(aes(Diagnosis.y, Mean_scaled, color = Gender)) + 
+    geom_jitter()
+
+df %>% ggplot(aes(Gender, Mean_scaled, color = Diagnosis.y)) + 
+    geom_jitter()
+```
+
+
+```{r}
+# Omitting obvious outliers
+df <- df %>% filter(Mean_scaled < 3)
+
+df %>% ggplot(aes(Gender, Mean_scaled, color = Diagnosis.y)) + 
+    geom_jitter()
+
+df %>% ggplot(aes(Diagnosis.y, Mean_scaled, color = Gender)) + 
+    geom_jitter()
+
+
+```
+
 
 
 ```{r}
@@ -337,6 +361,9 @@ df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SANS))
 
 ```
 
+
+
+
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
 - pitch variability (IQR) (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09)
@@ -361,16 +388,13 @@ df %>% group_by(Diagnosis.y) %>% summarize(median(Mean))
 
 df %>% group_by(Diagnosis.) %>% summarize(mean(IQR))
 
-
-
-
 ```
 
 
 
 
 ```{r}
-lm1 <- lmer(data = df, IQR_scaled ~ Diagnosis.x + (1|Participant))
+lm1 <- lmer(data = df, IQR_scaled ~ Diagnosis.x + (1 | Participant))
 summary(lm1)
 
 ```
@@ -403,7 +427,7 @@ summary(m4)
 
 pitch_vari_model <- glmer(data = df,
                           Diagnosis.x ~ IQR_scaled + (1 |
-                                                          Participant),
+                                                        Participant),
                           family = 'binomial')
 summary(pitch_vari_model)
 lmer()
