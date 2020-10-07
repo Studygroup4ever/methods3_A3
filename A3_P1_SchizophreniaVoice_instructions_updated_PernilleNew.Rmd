@@ -108,8 +108,11 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
-pacman::p_load(tidyverse, stringr,purrr,lme4,ggpubr)
+pacman::p_load(tidyverse, stringr,purrr,lme4,ggpubr,effsize)
+```
 
+
+```{r}
 read_pitch <- function(filename) {
     # load data
     df <- read.delim(filename, sep = "\t", header = T ) #Because they are tab separated
@@ -187,9 +190,15 @@ colnames(pitch_data) <- c('soundname',
 # Fixing rownames
 rownames(pitch_data) <- 1:nrow(pitch_data) #giving the rows numbers from 1 to total number of rows of pitch_dataframe
 
-# Filter study 1-4 (gonna wait)
-#pitch_data <- pitch_data %>% 
-#    filter(Study <= 4)
+# Fixing some classes 
+pitch_data$IQR <- as.numeric(pitch_data$IQR)
+pitch_data$Mean <- as.numeric(pitch_data$Mean)
+pitch_data$SD <- as.numeric(pitch_data$SD)
+pitch_data$Median <- as.numeric(pitch_data$Median)
+pitch_data$Participant <- as.numeric(pitch_data$Participant)
+
+pitch_data$Study <- as.numeric(pitch_data$Study)
+pitch_data$Diagnosis <- as.factor(pitch_data$Diagnosis)
 
 #write_csv(pitch_data, "pitch_data_danish_only.csv")
 ```
@@ -201,11 +210,10 @@ rownames(pitch_data) <- 1:nrow(pitch_data) #giving the rows numbers from 1 to to
 Dem_data <- read.csv("DemographicData.csv", sep = ';', header = T) %>% 
     filter(Language == "Danish")
     
-# Sort diagnosis
-Dem_data$Diagnosis <- sort(Dem_data$Diagnosis)
-
-# Give them new ID's
-Dem_data$ID <- 1:264 
+# Making some stuff
+Dem_data$Study <- as.numeric(Dem_data$Study)
+Dem_data$Gender <- as.factor(Dem_data$Gender)
+Dem_data$Diagnosis <- as.factor(Dem_data$Diagnosis)
 
         #so Control is
 which(Dem_data$Diagnosis == 'Control') #from 1-130
@@ -219,6 +227,7 @@ which(Dem_data$Diagnosis == 'Schizophrenia') #from 131-264
 # Loading Articulation data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
+#Arti_data$ASD..speakingtime.nsyll. <- as.numeric(Arti_data$ASD..speakingtime.nsyll.)
 ```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
@@ -231,23 +240,50 @@ pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "1", as.numeric(pitch_d
 ```
 
 ```{r}
-
-```
-
-
-```{r}
 # Now we merge them
 merged_df <- merge(pitch_data, Arti_data, by = 'soundname')
 
 merged_df <- merge(merged_df,Dem_data, by = 'Participant')
 
+# The maximum mean is with subject 1040, of #780.1012 Hz
+which.max(merged_df$Mean)
+merged_df$Mean[1040] 
+
+
+# Removing so we only have Danish studies
 merged_df <- merged_df %>% filter(Study.x <5)
 
 merged_df <- merged_df %>% filter(Study.y <5)
 
-# Now we save them
+# The maximum mean is with subject 858, of 305.669 HZ
+which.max(merged_df$Mean)
+merged_df$Mean[858] 
 
-#merged_df <- merged_df %>% na.omit() #only study 1 and 2 left
+
+# Select relevant variables
+variable.names(merged_df)
+
+df <- merged_df %>% select(
+    c(
+        Diagnosis.x,
+        Diagnosis.y,
+        Participant,
+        SANS,
+        SAPS,
+        Gender,
+        Study.y,
+        Trial,
+        npause,
+        dur..s.,
+        phonationtime..s.,
+        IQR,
+        speechrate..nsyll.dur.,
+        Age,
+        Mean,
+        Median
+    )
+) %>%
+    na.omit()
 
 ```
 
@@ -259,13 +295,8 @@ Finally, do the same by diagnosis and study, to assess systematic differences in
 I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
-# Reading in Julia's so we have the same. It is na-omitted
-#sounddata <- read.csv("sounddata.csv")
-
-#Trying something else
 
 # count participants
-#sounddata %>% group_by(Diagnosis.y) %>% summarise(mean(Age)) #F = 21.8, M = 23.8
 # because some participants occur various times in the dataset, a subset of Unique ID's will be made here to find the actual age
 sub_sounddata <- sounddata %>%
     group_by(ID) %>% 
@@ -300,7 +331,8 @@ sounddata <- sounddata %>%
     mutate(scale_pause_dur = scale(pause_dur),
            scale_phonation_time = scale(phonationtime..s.),
            scale_IQR = scale(IQR),
-           scale_speechrate_syll_dur = scale(speechrate..nsyll.dur.))#QUESTION: is it syllables pr SPOKEN second or just second in general
+           scale_speechrate_syll_dur = scale(speechrate..nsyll.dur.)) #QUESTION: is it syllables pr SPOKEN second or just second in general
+
 ```
 
 In order to avoid collinearity, we constructed a heatmap of the correlations between the variables.
@@ -422,6 +454,7 @@ sounddata$Diagnosis.y <- as.factor(sounddata$Diagnosis.y)
     summary(m4)
 ```
 
+PLOTS
 ```{r}
 ggline(sounddata,
        x = "Diagnosis.y",
@@ -472,5 +505,147 @@ which fixed and random effects should be included, given your dataset? E.g. what
 
 l <- glmer(Diagnosis.y ~ scale_pause_dur + (1|Participant), sounddata, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
 
+```
+
+
+Rerun: 
+
+First look at the missing data: we should exclude all recordings for which we do not have complete data.
+Then count the participants and recordings by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
+Finally, do the same by diagnosis and study, to assess systematic differences in studies.
+I like to use group_by() %>% summarize() for quick summaries
+
+```{r}
+df <- read.csv('pitch_data_withNA.csv')
+
+variable.names(df)
+
+df <- df %>% select(
+    c(
+        Diagnosis.x,
+        Diagnosis.y,
+        Participant,
+        SANS,
+        SAPS,
+        Gender,
+        Study.y,
+        Trial,
+        npause,
+        dur..s.,
+        phonationtime..s.,
+        IQR,
+        speechrate..nsyll.dur.,
+        Age,
+        Mean,
+        Median
+    )
+) %>%
+    na.omit()
+
+# Looking at npause, some of the data must be spuriously collected, because many of the instances of npause say 0 when duration and phonation time are NOT equal. These have to be sorted out:
+map1 <- df$dur..s.== df$phonationtime..s.
+map2 <- df$npause == 0
+
+df$npause <- ifelse(map1 == map2, df$npause, NA)
+
+df <- df %>% na.omit()
+          
+# Pause_dur
+df <- df %>% 
+    mutate(pause_dur = (dur..s.- phonationtime..s.)/npause)
+
+df$pause_dur <- ifelse(df$npause == 0,0, df$pause_dur) %>% as.numeric()
+
+# Proportion of spoken time
+df <- df %>% 
+    mutate(prop_spoken_time = phonationtime..s./dur..s.)
+
+# Scaling
+df <- df %>% 
+    mutate(scale_pause_dur = scale(pause_dur),
+           scale_phonation_time = scale(phonationtime..s.),
+           scale_IQR = scale(IQR),
+           scale_speechrate_syll_dur = scale(speechrate..nsyll.dur.),
+           scale_prop_spoken_time = scale(prop_spoken_time),
+           scale_mean = scale(Mean))
+
+# Removing outliers?
+# df <- df %>% 
+#     filter(scale_mean
+```
+
+Renaming
+```{r}
+
+```
+
+
+# MODELS 
+
+```{r}
+
+# Make response as a factor
+df$Diagnosis.y <- as.factor(df$Diagnosis.y)
+
+# 1st model: pitch variability: IQR. QUESTION: predict with gender?
+    m1 <- glmer(Diagnosis.y ~ scale_IQR + (1|Participant), df, family = "binomial")
+
+    summary(m1)
+# 2nd model: proportion of spoken time: Phonationtime (s): duration of the recording where speech is present
+    m2 <- glmer(Diagnosis.y ~ scale_phonation_time + (1|Participant), df, family = "binomial")
+
+    summary(m2)
+# 3rd model: speech rate: (nsyll/dur): average number of syllables per second
+    m3 <- glmer(Diagnosis.y ~ scale_speechrate_syll_dur + (1|Participant), df, family = "binomial")
+
+    summary(m3)
+# 4th model: pause duration: how long the pauses last 
+    m4 <- glmer(Diagnosis.y ~ scale_pause_dur + (1|Participant), df, family = "binomial")
+    
+    summary(m4)
+    
+# Predict diagnosis by mean pitch
+    
+    mean_m <- glmer(Diagnosis.y ~ Mean + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
+
+    summary(mean_m)
+    
+
+```
+
+Bigger models
+```{r}
+
+df <- df %>% 
+    mutate(scale_SAPS = scale(SAPS))
+
+m5 <- glmer(
+    Diagnosis.y ~ scale_pause_dur + 
+        scale_IQR + 
+        scale_prop_spoken_time + 
+        scale_speechrate_syll_dur + 
+        (1|Participant), df, 
+    family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
+
+summary(m5)
+
+```
+
+# PLOTS
+```{r}
+ggpubr::ggline(df,
+       x = "Diagnosis.y",
+       y = "scale_IQR",
+       col = "Diagnosis.y",
+       add = c("mean_se", "dodge"),
+       palette = "jco")
+
+ggplot(aes(x = Diagnosis.y, y = pause_dur, group=1), data = df) + 
+  geom_line()
+
+```
+
+```{r}
+glmer()
 ```
 
