@@ -456,6 +456,97 @@ heatmap <- round(cor(heat_df), 2) %>%
 heatmap
 ```
 
+```{r}
+# Building models
+
+#Changing some variables to factors
+df$Diagnosis.y <- as.factor(df$Diagnosis.y)
+df$Participant <- as.factor(df$Participant)
+
+# Predicting diagnosis by IQR including random intercepts for participants
+m_pitch <-
+  glmer(Diagnosis.y ~ IQR_scaled + (1 | Participant),
+        df,
+        family = "binomial",
+        control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE),
+        REML = FALSE
+      )
+
+# Predicting diagnosis by proportion of spoken time including random intercepts for participants
+m_pst <- 
+  glmer(Diagnosis.y ~ ProportionSpokenTime_scaled + (1 | Participant),
+        df,
+       family = "binomial",
+        control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE),
+       REML = FALSE
+      )
+
+# Predicting diagnosis by speech rate including random intercepts for participants
+m_sr <-
+  glmer(Diagnosis.y ~ SpeechRate_scaled + (1 | Participant),
+       df,
+       family = "binomial",
+       control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
+      )
+
+# Predicting diagnosis by pause duration including random intercepts for participants
+m_pd <-
+  glmer(Diagnosis.y ~ pause_dur_scaled + (1 | Participant),
+        df,
+        family = "binomial",
+        control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE)
+       )
+
+# Predicting diagnosis by pause duration and IQR including random intercepts for participants
+m_max1 <-
+  glmer(Diagnosis.y ~ IQR_scaled + pause_dur_scaled + (1 | Participant),
+        df,
+        family = "binomial")
+
+# Predicting diagnosis by speech rate and IQR including random intercepts for participants
+m_max2 <-
+  glmer(Diagnosis.y ~ IQR_scaled + SpeechRate_scaled + (1 | Participant),
+        df,
+        family = "binomial")
+
+# Predicting diagnosis by proportion of spoken time and IQR including random intercepts for participants
+m_max3 <-
+  glmer(Diagnosis.y ~ IQR_scaled + ProportionSpokenTime_scaled + (1 | Participant),
+        df,
+        family = "binomial")
+
+# Comparing models with anova
+anova(m_pitch, m_pst, m_sr, m_pd)
+anova(m_max1, m_max2, m_max3)
+
+# Making linear models
+
+# Predicting IQR by diagnosis including random intercepts for participants
+m1 <-
+  lmerTest::lmer(data = df,
+                 IQR_scaled ~ Diagnosis.y + (1 | Participant),
+                 REML = FALSE)
+
+# Predicting proportion of spoken time by diagnosis including random intercepts for participants
+m2 <-
+  lmerTest::lmer(data = df,
+                 ProportionSpokenTime_scaled ~ Diagnosis.y + (1 | Participant),
+                 REML = FALSE)
+
+# Predicting speech rate by diagnosis including random intercepts for participants
+m3 <-
+  lmerTest::lmer(data = df,
+                 SpeechRate_scaled ~ Diagnosis.y + (1 | Participant),
+                 REML = FALSE)
+
+# Predicting pause duration by diagnosis including random intercepts for participants
+m4 <-
+  lmerTest::lmer(data = df,
+                 pause_dur_scaled ~ Diagnosis.y + (1 | Participant),
+                 REML = FALSE)
+
+```
+
 
 
 
