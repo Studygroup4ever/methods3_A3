@@ -110,7 +110,7 @@ See placeholder code here for help.
 ```{r}
 library(pacman)
 
-p_load(purrr, tidyverse, reshape2, lme4, sjmisc, sjlabelled, sjPlot)
+p_load(purrr, tidyverse, reshape2, lme4, effsize)
 ```
 
 ```{r}
