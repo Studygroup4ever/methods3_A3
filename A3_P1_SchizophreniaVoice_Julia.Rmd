@@ -112,7 +112,7 @@ demo <- read.csv("DemographicData.csv", sep = ";")
 demo %>% filter(Diagnosis == "Control") 
 library(tidyverse)
 
-danish <- demo %>% filter(Language == "Danish") 
+danish <- pitch_data %>% filter(Study < 5)
 danish %>% group_by(Diagnosis) %>%  summarise(age_count=n())
 
 danish$ID <- 1:264
@@ -259,7 +259,7 @@ sounddata$Study.x ==sounddata$Study.y
 
 sounddata <-  sounddata %>% filter(Study.x < 5)
 
-
+summary(mean(sounddata$SANS))
 
 ```
 
@@ -274,7 +274,7 @@ I like to use group_by() %>% summarize() for quick summaries
 sounddata <- sounddata %>%  na.omit()
 write.csv(sounddata, "sounddata.csv")
 
-sounddata %>% group_by(Study.x) %>%  summarise(mean(Age))
+sounddata %>% group_by(Study.x) %>%  summarise(gender_count = n())
 ```
 
 ## Now we can analyze the data
@@ -295,6 +295,39 @@ N.N.N.B. If you want to estimate the studies separately, you can try this syntax
 - Bonus points: cross-validate the models and report the betas and standard errors from all rounds to get an idea of how robust the estimates are. 
 
 ```{r}
+library(tidyverse)
+
+sounddata$pause_dur <-  (sounddata$dur..s.-sounddata$phonationtime..s.)/sounddata$npause
+sounddata$pause_dur <- ifelse(sounddata$npause == 0,NA,sounddata$pause_dur)
+
+sounddata$pause_dur <- as.numeric(sounddata$pause_dur)
+
+sounddata <- sounddata %>% 
+    mutate(IQR_scale = scale(IQR)) %>% 
+    mutate(phonationtime_scale = scale(phonationtime..s.)) %>% 
+    mutate(speechrate_scale = scale(speechrate..nsyll.dur.)) %>% 
+    mutate(pause_dur_scale = scale(pause_dur))
+
+pacman::p_load(lme4)
+
+sounddata$Diagnosis.x <- as.factor(sounddata$Diagnosis.x)
+
+m1 <- glmer(Diagnosis.x ~IQR_scale + (1|Participant),data=sounddata, family =binomial)
+
+m2 <- glmer(Diagnosis.x ~ phonationtime_scale+ (1|Participant),data = sounddata, family = binomial )
+#speech rate
+m3 <- glmer(Diagnosis.x ~ speechrate_scale+ (1|Participant),data=sounddata, family = binomial)
+#pause dur
+m4 <- glmer(Diagnosis.x ~ pause_dur_scale+ (1|Participant), data = sounddata,family = binomial)
+
+
+
+
+m5 <- glmer(Diagnosis.x ~ 0 + Study.x + Study.x:Diagnosis.x + (1|Participant), data=sounddata, family = binomial)
+
+m1
+
+
    set.seed(1)
    x <- runif(7)
 
