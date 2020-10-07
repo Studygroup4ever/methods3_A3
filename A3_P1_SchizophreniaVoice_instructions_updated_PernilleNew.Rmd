@@ -108,7 +108,7 @@ Only then (when everything works) turn the code into a function and use map_df()
 See placeholder code here for help.
 
 ```{r}
-pacman::p_load(tidyverse, stringr,purrr,lme4,ggpubr,effsize)
+pacman::p_load(tidyverse, stringr,purrr,lme4,ggpubr,effsize,MuMIn,caret)
 ```
 
 
@@ -544,85 +544,233 @@ df <- df %>%
            scale_prop_spoken_time = scale(prop_spoken_time),
            scale_mean = scale(Mean))
 
-# The final dataframe is called npausefixed.csv and has 1424 observations.
+# The final dataframe is called npause_fixed.csv and has 1424 observations. Gonna read that in to be sure:
+df <- read.csv("npause_fixed.csv")
 ```
 
-# Visualize
+# Visualizing
 ```{r}
+
+df %>% ggplot(aes(Diagnosis.y, Mean_scaled, color = Gender)) + geom_jitter() + labs(x = "Diagnosis", y = "Mean (scaled)")
+
+df %>% ggplot(aes(Gender, Mean_scaled, color = Diagnosis.y)) + geom_jitter() + labs(x = "Gender", y = "Mean (scaled)")
 
 ```
 
 # Removing outliers
+Removing all values above 3 z-scores
 ```{r}
+df <- df %>% filter(Mean_scaled < 3) 
 
+# plot to see difference
+df %>% ggplot(aes(Diagnosis.y, Mean_scaled, color = Gender)) + geom_jitter() + labs(x = "Diagnosis", y = "Mean (scaled)")
+
+df %>% ggplot(aes(Gender, Mean_scaled, color = Diagnosis.y)) + geom_jitter() + labs(x = "Diagnosis", y = "Mean (scaled)")
 
 ```
 
 # MODELS 
 
 ```{r}
+
+variable.names(df)
 # Make response as a factor
 df$Diagnosis.y <- as.factor(df$Diagnosis.y)
 
 # 1st model: pitch variability: IQR. QUESTION: predict with gender?
-    m1 <- glmer(Diagnosis.y ~ scale_IQR + (1|Participant), df, family = "binomial")
+    m1 <- glmer(Diagnosis.y ~ IQR_scaled + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
 
     summary(m1)
 # 2nd model: proportion of spoken time: Phonationtime (s): duration of the recording where speech is present
-    m2 <- glmer(Diagnosis.y ~ scale_phonation_time + (1|Participant), df, family = "binomial")
+    m2 <- glmer(Diagnosis.y ~ ProportionSpokenTime_scaled + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
 
     summary(m2)
 # 3rd model: speech rate: (nsyll/dur): average number of syllables per second
-    m3 <- glmer(Diagnosis.y ~ scale_speechrate_syll_dur + (1|Participant), df, family = "binomial")
+    m3 <- glmer(Diagnosis.y ~ SpeechRate_scaled + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
 
     summary(m3)
 # 4th model: pause duration: how long the pauses last 
-    m4 <- glmer(Diagnosis.y ~ scale_pause_dur + (1|Participant), df, family = "binomial")
+    m4 <- glmer(Diagnosis.y ~ pause_dur_scaled + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
     
     summary(m4)
     
 # Predict diagnosis by mean pitch
-    
-    mean_m <- glmer(Diagnosis.y ~ Mean + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
+    mean_m <- glmer(Diagnosis.y ~ Mean_scaled + (1|Participant), df, family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
 
     summary(mean_m)
-    
 
 ```
 
-Bigger models
+
+### HEDGES G
+Effect size tells you how much one group differs from another — usually a difference between an experimental group and control group.
+
+So our experimental group is our Schizophrenic people, and our control group is Control people. 
+
+A g of 1 indicates the two groups differ by 1 standard deviation, a g of 2 indicates they differ by 2 standard deviations, and so on. Standard deviations are equivalent to z-scores (1 standard deviation = 1 z-score).
+
+## Now we can analyze the data
+If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
+- pitch variability (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09) # IQR
+- proportion of spoken time (lower, Hedges' g: -1.26, 95% CIs: -2.26, 0.25) #Prop
+- speech rate (slower, Hedges' g: -0.75, 95% CIs: -1.51, 0.04) #Speechrate
+- pause duration (longer, Hedges' g: 1.89, 95% CIs: 0.72, 3.21). (Duration - Spoken Duration) / PauseN #Pause_dur
+
+Manual way:
+esc_mean_sd(grp1m = 10.3, grp1sd = 2.5, grp1n = 60,
+grp2m = 12.3, grp2sd = 3.1, grp2n = 56, es.type = "g")
+
+Cohens d way:
 ```{r}
 
-df <- df %>% 
-    mutate(scale_SAPS = scale(SAPS))
+# To use cohen's d command, we will make two subset df's separately only having Schizophrenia participants or control
+df_Sch <- df %>% 
+  filter(Diagnosis.y == "Schizophrenia")
 
-m5 <- glmer(
-    Diagnosis.y ~ scale_pause_dur + 
-        scale_IQR + 
-        scale_prop_spoken_time + 
-        scale_speechrate_syll_dur + 
-        (1|Participant), df, 
-    family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
+df_Con <- df %>% 
+  filter(Diagnosis.y == "Control")
 
-summary(m5)
+# IQR
+cohen.d(df_Sch$IQR_scaled, df_Con$IQR_scaled, na.rm = TRUE, pooled = TRUE, paired = FALSE, hedges = TRUE) 
+# Our g: -0.26, 95% CIs: -0.36, -0.16
+# Meta g: -0.55, 95% CIs: -1.06, 0.09
+
+# Prop of spoken time
+cohen.d(df_Sch$ProportionSpokenTime_scaled, df_Con$ProportionSpokenTime_scaled, na.rm = TRUE, pooled = TRUE, paired = FALSE, hedges = TRUE)
+# Our g: -0.10, 95% CIs: -0.20, -0.03
+# Meta g: -1.26, 95% CIs: -2.26, 0.25
+
+# Speechrate 
+cohen.d(df_Sch$SpeechRate_scaled, df_Con$SpeechRate_scaled, na.rm = TRUE, pooled = TRUE, paired = FALSE, hedges = TRUE)
+# Our g: -0.25, 95% CIs: -0.35, -0.14
+# Meta g: -0.75, 95% CIs: -1.51, 0.04
+
+# Pause duration 
+cohen.d(df_Sch$pause_dur_scaled, df_Con$pause_dur_scaled, na.rm = TRUE, pooled = TRUE, paired = FALSE, hedges = TRUE)
+# Our g: 0.18, 95% CIs: 0.07, 0.29
+# Meta g: 1.89, 95% CIs: 0.72, 3.21
 
 ```
 
-# PLOTS
+Power 
 ```{r}
-ggpubr::ggline(df,
-       x = "Diagnosis.y",
-       y = "scale_IQR",
-       col = "Diagnosis.y",
-       add = c("mean_se", "dodge"),
-       palette = "jco")
-
-ggplot(aes(x = Diagnosis.y, y = pause_dur, group=1), data = df) + 
-  geom_line()
 
 ```
 
+Confusion matrix
 ```{r}
-glmer()
+# Split the data
+NROW(df) 1416
+
+
+groups <-
+  df %>%
+  select(Participant) %>%
+  distinct(Participant) %>%
+  rowwise() %>%
+  mutate(group = sample(
+    c("train", "test"),
+    1,
+    replace = TRUE,
+    prob = c(0.5, 0.5) # Set weights for each group here
+  ))
+
+df_g <- merge(df,groups, by = "Participant")
+
+df_g_train <- (filter(df_g, group == "train")) #720 subs
+df_g_test <- (filter(df_g, group == "test")) #696 subs
+
+# Here is some code for checking that all variables in both train and test contain the same levels.
+# Look at levels of each variable in each dataframe to find which variable has unequal levels
+count_levels <- function(x) factor(x) %>% levels %>% n_distinct
+
+df_g_train %>% summarise_all(count_levels) == df_g_test %>% summarise_all(count_levels)
+
+# Collect all levels of the variable from both datasets and combine into one vector
+complete_factor_levels <- c(df_g_train$Diagnosis.y %>% factor %>% levels, df_g_test$Diagnosis.y %>% factor %>% levels) %>% unique
+
+# Assign the complete factor levels to the variable in both datasets
+df_g_train <- df_g_train %>% 
+  mutate(Diagnosis.y = factor(Diagnosis.y, levels = complete_factor_levels))
+
+df_g_test <- df_g_test %>% 
+  mutate(Diagnosis.y = factor(Diagnosis.y, levels = complete_factor_levels))
+
+#Confirm that levels are now the same between the datasets
+levels(df_g_train$Diagnosis.y) == levels(df_g_test$Diagnosis.y)
+
+# Fit model to train data
+trained_model <- glmer(Diagnosis.y ~ pause_dur_scaled + (1|Participant) , df_g_train, family = "binomial", control = glmerControl(optimizer = "nloptwrap", calc.derivs = FALSE))
+
+# Predict values in test data (type = response gives predicted probabilities)
+predicted_probs_test = predict(trained_model, df_g_test, allow.new.levels = TRUE, type = "response")
+
+# Extract actual Diagnosis Schizo categories, i.e. 'true answers' from the original dataframe
+actual_categories_test = df_g_test$Diagnosis.y
+
+# Make a dataframe to see predicted probabilities of Diagnosis Schizo category against the actual category
+pred_df_test <- tibble(predicted_probs_test, actual_categories_test)
+
+# Make a new column to see more easily what our model predicted: if probability is less than 0.5 - it predicted 'Control' (0), otherwise - it predicted 'Schizophrenia' (1)
+pred_df_test$predicted_category = ifelse(pred_df_test$predicted_probs_test < 0.5, "0", "1")
+
+# Let's see first 6 rows
+head(pred_df_test)
+
+#make sure predicted category is a factor (at the moment it's a character variable due to the way we specified ifelse outcomes)
+pred_df_test$predicted_category <- as_factor(pred_df_test$predicted_category)
+
+pred_df_test$actual_categories_test <- as_factor(pred_df_test$actual_categories_test)
+
+#make the confusion matrix
+confusionMatrix(pred_df_test$predicted_category, pred_df_test$actual_categories_test, positive = "1")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+MODELS STUFF
+```{r}
+
+# df <- df %>% 
+#     mutate(scale_SAPS = scale(SAPS))
+# 
+# m5 <- glmer(
+#     Diagnosis.y ~ scale_pause_dur + 
+#         scale_IQR + 
+#         scale_prop_spoken_time + 
+#         scale_speechrate_syll_dur + 
+#         (1|Participant), df, 
+#     family = "binomial", control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE))
+# 
+# summary(m5)
+
+```
+
+# PLOTS THAT DOESNT WORK RIGHT...
+```{r}
+# 
+# ggline(df,
+#        x = "Diagnosis.y",
+#        y = "IQR",
+#        col = "Diagnosis.y",
+#        add = c("mean_se", "dodge"),
+#        palette = "jco")
+# 
 ```
 
