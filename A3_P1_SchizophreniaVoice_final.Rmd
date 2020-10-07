@@ -2,7 +2,9 @@
 title: "Final A3P1"
 author: "Klara, Pernille, Søren, Clement & Julia"
 date: "10/7/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
