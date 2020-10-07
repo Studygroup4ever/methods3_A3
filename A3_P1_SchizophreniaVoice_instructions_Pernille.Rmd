@@ -125,6 +125,7 @@ See placeholder code here for help.
 ```{r}
 pacman::p_load(tidyverse, stringr)
 
+###### STUFF
 Demo <- read.csv("DemographicData.csv", sep = ";", header = T)
 
 DemoDanish <- subset(Demo, Language == "Danish")
@@ -133,39 +134,85 @@ DemoDanish$ID <- 1:264
 
 Arti <- read.delim("Articulation.txt", header = TRUE, sep = ",")
 
-Pitch <- 
-    for n in length(list)
-
 read.delim("Articulation.txt", header = TRUE, sep = ",")
 
-testPitch <-  read.delim("Pitch/Study5D1S26T2.txt", sep = "\t", header = T)
-
-f <- str_extract("Study5D1S26T2.txt", 'T(\\dT\\d|\\d)')
+# filename <-  read.delim("Pitch/Study5D1S26T2.txt")
+# filename <- "Study5D1S26T2.txt"
 
 #for(n in 1:length(list){...})
 
+#SØREN MAGIC 
+# pos = str_locate(filename, 'T')[1]
+# split = str_split(filename, '') # for at få længde
+# split[[1]]
+#substr(filename, pos, length(split[[1]])) #finder T, og tager fra T til længden af vores string
+#str_extract("Study5D1S26T2.txt",'\\d\\d\)
+
 # only study 1-4
+
+
+
 read_pitch <- function(filename) {
     # load data
     df <- read.delim(filename, sep = "\t", header = T)
     
     # parse filename to extract study, diagnosis, subject and trial
-    #Study5D1S26T2
-    Study <- str_extract(filename, 'Study.')
-    Diagnosis <- str_extract(filename, 'D.')
-    Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)')
-    Trial <- str_extract(filename, 'T(\\dT\\d|\\d)')
+    Study <- str_extract(filename, 'Study.') %>% 
+        str_remove('Study')
+    
+    Diagnosis <- str_extract(filename, 'D.') %>% 
+        str_remove('D')
+        
+    Subject <- str_extract(filename, 'S(\\d\\d\\d|\\d\\d)') #kig efter 3 først
+    
+    pos <- str_locate(filename, 'T')[1]
+    split <- strsplit(filename, '') #del alting
+    Trial <- substr(filename, pos, length(split[[1]]))
     
     # extract pitch descriptors (mean, sd, iqr, etc)
-    
+    mean <- mean(df$f0)
+    sd <- sd(df$f0)
+    median <- median(df$f0)
+    iqr <- IQR(df$f0)
     
     # combine all this data in one dataset
-    data <- c(f_name, Study, Diagnosis, Subject)
+    data <- c(filename, Study, Diagnosis, Subject, Trial, mean, sd, median, iqr)
      return(data)
 }
+
+#iqr #difference between Q3 and Q1, dispersion
+test_data <-  read_pitch("Pitch/Study1D0S101T1_f0.txt")
+test_data
+
+IQR("Pitch/Study1D0S101T10_f0.txt")
 # try lapply??
 ```
 
+
+```{r}
+# Reading in
+list <- list.files(path = "Pitch/",pattern = "*.txt", full.names = T)
+
+list
+
+lille = read.table(list, header = T)
+ 
+store = NULL
+for (i in 1:2) {
+        lille = read.table(list[i], header = T)
+        lille$dirname = str_sub(list[i])
+        lille$study = str_sub(lille$dirname,8,13)
+        lille$diagnosis = str_sub(lille$dirname,14,15)
+        lille$subject = str_sub(lille$dirname,16,17)
+        lille$trial = str_sub(lille$dirname,14,15)
+        store = rbind(store,lille)
+        print(i)
+        
+}
+
+str_sub(filename, )
+
+```
 
 ```{r}
 #Det jeg fik fra gruppen
