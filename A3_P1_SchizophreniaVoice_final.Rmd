@@ -1,10 +1,9 @@
 ---
-title: "Assignment 3 - Part 1 - Voice In Schizophrenia"
+title: "Final A3P1"
 author: "Søren Orm Hansen"
-date: "October, 2020"
+date: "10/7/2020"
 output: html_document
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -112,8 +111,9 @@ library(pacman)
 p_load(purrr, tidyverse, reshape2, lme4, sjmisc, sjlabelled, sjPlot)
 ```
 
-
 ```{r}
+# Defining functions
+
 read_pitch <- function(filename) {
     # load data
     df <- read.delim(filename, sep = '\t', header = T)
@@ -218,18 +218,12 @@ Dem_data$Diagnosis <- as.factor(Dem_data$Diagnosis)
 # Loading more data
 Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
-# Might be problematic
-#Arti_data$ASD..speakingtime.nsyll. <- as.numeric(Arti_data$ASD..speakingtime.nsyll.)
-
-pitch_data %>% group_by(Diagnosis) %>% summarise(min(Mean))
 ```
 
 ### Now you need to merge demographic/clinical, duration and pitch data
 
 ```{r}
-# Let's start with the demographic and clinical data
-
-# then duration data
+# Participant ID had duplicates - this is solved by adding 1000 to the schizophrenic participant
 Dem_data$Participant <- ifelse(Dem_data$Diagnosis == "Control",
                                as.numeric(Dem_data$Participant),
                                as.numeric(Dem_data$Participant)+1000)
@@ -237,31 +231,25 @@ pitch_data$Participant <- ifelse(pitch_data$Diagnosis == "0",
                                  as.numeric(pitch_data$Participant),
                                  as.numeric(pitch_data$Participant)+1000)
 
-
+# Merging the demographic and pitch data
 pitch_arti <- merge(Arti_data, pitch_data, by = 'soundname')
 
-
+# Making the participants as a factor
 pitch_arti$Participant <- as.factor(pitch_arti$Participant)
 Dem_data$Participant <- as.factor(Dem_data$Participant)
 
+# Study is different for the pitch/articulation data and the demographic data
+# We merge the demographic data with the pitch and articulation data and filter out the studies that are not Danish
 df <- merge(pitch_arti, Dem_data, by = "Participant") %>% 
     filter(Study.x < 5 & Study.y < 5)
 
-#unique(df$Study.x == df$Study.y)
-
-
-# Finally the pitch data
-#View(df)
 ```
 
-## Now we need to describe our sample
-
-First look at the missing data: we should exclude all recordings for which we do not have complete data.
-Then count the participants and recordings by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
-Finally, do the same by diagnosis and study, to assess systematic differences in studies.
-I like to use group_by() %>% summarize() for quick summaries
+### Cleaning the merged data
 
 ```{r}
+# There are a lot of NA's in the data set
+# First we select only the variables we are going to use in the description and analysis of the data and omit NA's
 df <- df %>% select(
     c(
         Diagnosis.x,
@@ -283,41 +271,52 @@ df <- df %>% select(
 ) %>%
     na.omit()
 
-map1 <- df$dur..s. == df$phonationtime..s. 
+# For some of the participants the duration of the trial and the phonation time was not the same, but they still had a npause of 0 - as this must be a result of faulty coding of the data, we have omitted them
+
+# Logic map of where duration and phonation time and duration is the same (where the number of pauses should be 0)
+map1 <- df$dur..s. == df$phonationtime..s.
+
+# Logic map of where the number of pauses is 0
 map2 <- df$npause == 0
 
+# changing the number of pauses to NA where the two logic maps don't match
 df$npause <- ifelse(map1 == map2, df$npause, NA)
 
-df <- df %>% na.omit() %>%  
+# Omitting the NA's created above
+df <- df %>% na.omit() 
+
+# Creating a variable for the pause duration
+df <- df %>%  
     mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
 
+# Setting pause duration to 0 where the number of pauses is 0
 df$pause_dur <- ifelse(df$npause == 0, 0, df$pause_dur) %>% as.numeric()
 
 df <- df %>% 
-    mutate(pause_dur_scaled = scale(pause_dur)) %>% 
-    mutate(IQR_scaled = scale(IQR)) %>% 
-    mutate(SpeechRate_scaled = scale(speechrate..nsyll.dur.)) %>% 
-    mutate(ProportionSpokenTime_scaled = scale(phonationtime..s./dur..s.)) %>% 
-    mutate(ProportionSpokenTime = phonationtime..s./dur..s.) %>% 
-    mutate(SAPS_scaled = scale(SAPS)) %>% 
-    mutate(Mean_scaled = scale(Mean))
+    mutate(pause_dur_scaled = scale(pause_dur)) %>% # Scaling the pause duration
+    mutate(IQR_scaled = scale(IQR)) %>% # Scaling the IQR
+    mutate(SpeechRate_scaled = scale(speechrate..nsyll.dur.)) %>% # Scaling the speech rate variable
+    mutate(ProportionSpokenTime = phonationtime..s./dur..s.) %>% # Creating a variable for proportion of spoken time
+    mutate(ProportionSpokenTime_scaled = scale(phonationtime..s./dur..s.)) %>% # Scaling the proportion of spoken time
+    mutate(SAPS_scaled = scale(SAPS)) %>% # Scaling the SAPS
+    mutate(Mean_scaled = scale(Mean)) # Scaling the SANS
 
+# Making diagnosis a factor
 df$Diagnosis.x <- as.factor(df$Diagnosis.x)
 
-df_sub <- df %>% 
-    select(c(Diagnosis.x, pause_dur_scaled, Participant)) %>% 
-    na.omit()
-
-write.csv(df, 'npause_fixed.csv')
+#write.csv(df, 'npause_fixed.csv')
 ```
 
-```{r}
-df <- read.csv('npause_fixed.csv')
-```
+## Now we need to describe our sample
+
+First look at the missing data: we should exclude all recordings for which we do not have complete data.
+Then count the participants and recordings by diagnosis, report their gender, age and symptom severity (SANS, SAPS and Social)
+Finally, do the same by diagnosis and study, to assess systematic differences in studies.
+I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
-# Plots of the data
-df %>% ggplot(aes(Diagnosis.y, Mean_scaled, color = Gender)) + 
+# Plotting the data
+df %>% ggplot(aes(Diagnosis.y, Mean, color = Gender)) + 
     geom_jitter()
 
 df %>% ggplot(aes(Gender, Mean_scaled, color = Diagnosis.y)) + 
@@ -337,33 +336,28 @@ df %>% ggplot(aes(Diagnosis.y, Mean_scaled, color = Gender)) +
 
 ```
 
-
-
 ```{r}
+# Describing our sample
+df %>% group_by(Diagnosis.y) %>% summarize(n()) # Count of diagnosis
+df %>% group_by(Diagnosis.y) %>% summarize(mean(SAPS)) # Mean SAPS by diagnosis
+df %>% group_by(Diagnosis.y) %>% summarize(mean(SANS))# Mean SANS by diagnosis
 
-df %>% group_by(Diagnosis.y) %>% summarize(n())
-df %>% group_by(Diagnosis.y) %>% summarize(mean(SAPS))
-df %>% group_by(Diagnosis.y) %>% summarize(mean(SANS))
+df %>% group_by(Diagnosis.x, Gender) %>% summarize(n()) # Gender distribution by diagnosis
 
-df %>% group_by(Diagnosis.x, Gender) %>% summarize(n())
+df %>% group_by(Gender) %>% summarize(n()) # General gender distribution
 
-df %>% group_by(Gender) %>% summarize(n())
+df %>% group_by(Participant) %>% slice(1) %>% group_by(Gender) %>% summarize(mean(Age), sd(Age)) # Mean age by gender
+df %>% group_by(Participant) %>% slice(1) %>% group_by(Diagnosis.y) %>% summarize(mean(Age), sd(Age)) # Mean age by diagnosis
 
-df %>% group_by(Participant) %>% slice(1) %>% group_by(Gender) %>% summarize(mean(Age))
-df %>% group_by(Participant) %>% slice(1) %>% group_by(Diagnosis.y) %>% summarize(mean(Age))
+df %>% group_by(Study.y) %>% summarize(n()) # Count of study
+df %>% group_by(Study.y) %>% summarize(mean(SANS)) # Mean SANS by study
+df %>% group_by(Study.y) %>% summarize(mean(SAPS)) # Mean SAPS by study
+df %>% group_by(Study.y) %>% summarize(mean(Age)) # Mean age by study
 
-df %>% group_by(Study.y) %>% summarize(n())
-df %>% group_by(Study.y) %>% summarize(mean(SANS))
-df %>% group_by(Study.y) %>% summarize(mean(SAPS))
-df %>% group_by(Study.y) %>% summarize(mean(Age))
-
-df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SAPS))
-df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SANS))
+df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SAPS)) # Mean SAPS by study and diagnosis
+df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SANS)) # Mean SANS by study and diagnosis
 
 ```
-
-
-
 
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
@@ -382,100 +376,15 @@ N.N.N.B. If you want to estimate the studies separately, you can try this syntax
 
 - Bonus points: cross-validate the models and report the betas and standard errors from all rounds to get an idea of how robust the estimates are. 
 
-```{r}
-df %>% group_by(Diagnosis.y) %>% summarize(mean(Mean_scaled))
-df %>% group_by(Diagnosis.y) %>% summarize(mean(Mean))
-df %>% group_by(Diagnosis.y) %>% summarize(median(Mean))
-
-df %>% group_by(Diagnosis.y) %>% summarize(mean(ProportionSpokenTime), sd(ProportionSpokenTime))
-df %>% group_by(Diagnosis.y) %>% summarize(mean(speechrate..nsyll.dur.), sd(speechrate..nsyll.dur.))
-df %>% group_by(Diagnosis.y) %>% summarize(mean(IQR), sd(IQR))
-df %>% group_by(Diagnosis.y) %>% summarize(mean(pause_dur), sd(pause_dur))
-
-```
-
-
-
 
 ```{r}
-lm1 <- lmer(data = df, IQR_scaled ~ Diagnosis.x + (1 | Participant))
-summary(lm1)
+# Discribing acustic features of the sample
+df %>% group_by(Diagnosis.y) %>% summarize(mean(ProportionSpokenTime), sd(ProportionSpokenTime)) # Mean and sd for the proportion of spoken time by diagnosis
+df %>% group_by(Diagnosis.y) %>% summarize(mean(speechrate..nsyll.dur.), sd(speechrate..nsyll.dur.)) # Mean and sd for the speech rate by diagnosis
+df %>% group_by(Diagnosis.y) %>% summarize(mean(IQR), sd(IQR)) # Mean and sd for the IQR by diagnosis
+df %>% group_by(Diagnosis.y) %>% summarize(mean(pause_dur), sd(pause_dur)) # Mean and sd for the pause duration by diagnosis
 
 ```
-
-
-
-
-```{r}
-m1 <- glm(data = df, Diagnosis.x ~ IQR_scaled, family = 'binomial')
-summary(m1)
-
-m2 <-
-    glm(data = df,
-        Diagnosis.x ~ ProportionSpokenTime_scaled,
-        family = 'binomial')
-summary(m2)
-
-m3 <-
-    glm(data = df,
-        Diagnosis.x ~ SpeechRate_scaled,
-        family = 'binomial')
-summary(m3)
-
-m4 <-
-    glm(data = df,
-        Diagnosis.x ~ pause_dur_scaled,
-        family = 'binomial')
-summary(m4)
-
-
-pitch_vari_model <- glmer(data = df,
-                          Diagnosis.x ~ IQR_scaled + (1 |
-                                                        Participant),
-                          family = 'binomial')
-summary(pitch_vari_model)
-lmer()
-
-
-SpokenTime_model <- glmer(
-    data = df,
-    Diagnosis.x ~ ProportionSpokenTime_scaled + (1 | Participant),
-    family = 'binomial'
-)
-summary(SpokenTime_model)
-
-SpeechRate_model <-
-    glmer(
-        data = df,
-        Diagnosis.x ~ SpeechRate_scaled + (1 | Participant),
-        family = 'binomial'
-    )
-summary(SpeechRate_model)
-
-pause_dur_model <-
-    glmer(data = df,
-          Diagnosis.x ~ pause_dur_scaled  + (1 | Participant),
-          family = 'binomial')
-summary(pause_dur_model)
-
-```
-
-```{r}
-max_model <- glmer(data = df, 
-                   Diagnosis.x ~ IQR_scaled +
-                       ProportionSpokenTime_scaled + 
-                       SpeechRate_scaled + 
-                       pause_dur_scaled +
-                       (1|Participant),
-                   family = 'binomial',
-                   control = glmerControl(optimizer ="nloptwrap", calc.derivs = FALSE)
-                   )
-
-summary(max_model)
-
-vif(max_model)
-```
-
 
 In order to avoid collinearity, we constructed a heatmap of the correlations between the variables.
 ```{r}
@@ -495,79 +404,11 @@ get_upper_tri <- function(cormat) {
 ```
 
 ```{r}
-heat_df <- df %>% 
-    select(-c(soundname, Filename, Study.y, Language, Diagnosis.y, X)) %>%
-    na.omit() %>% 
-    mutate(Trial = as.numeric(as.factor(Trial))) %>% 
-    mutate(Diagnosis.x = as.numeric(as.factor(Diagnosis.x))) %>% 
-    mutate(Gender = as.numeric(as.factor(Gender)))
-
-colnames(heat_df)[7] <- 'AtrPhon'
-colnames(heat_df)[6] <- 'SpeechRate'
-colnames(heat_df)[8] <- 'ASD_Speak'
-```
-
-
-```{r}
-heat_df2 <- df %>% select(-c(Diagnosis.y, Trial)) %>% 
+# Getting rid of some variables and making gender numeric
+heat_df <- df %>% select(-c(Diagnosis.y, Trial)) %>% 
   mutate(Gender = as.numeric(as.factor(Gender)))
 
-heatmap <- round(cor(heat_df2), 2) %>%
-    reorder_cormat() %>%
-    get_upper_tri() %>%
-    melt(na.rm = T) %>%
-    ggplot(aes(Var2, Var1, fill = value)) +
-    geom_tile(color = "white") +
-    scale_fill_gradient2(
-        low = "blue",
-        high = "red",
-        mid = "white",
-        midpoint = 0,
-        limit = c(-1, 1),
-        space = "Lab",
-        name = "Pearson\nCorrelation"
-    ) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(
-        angle = 45,
-        vjust = 1,
-        size = 10,
-        hjust = 1
-    )) +
-    coord_fixed() + geom_text(aes(Var2, Var1, label = value),
-                              color = "black",
-                              size = 3) +
-    theme(
-        axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.border = element_blank(),
-        panel.background = element_blank(),
-        axis.ticks = element_blank(),
-        legend.justification = c(1, 0),
-        legend.position = c(0.6, 0.7),
-        legend.direction = "horizontal"
-    ) +
-    guides(fill = guide_colorbar(
-        barwidth = 7,
-        barheight = 1,
-        title.position = "top",
-        title.hjust = 0.5
-    ))
-
-heatmap
-```
-
-
-
-```{r}
-#Building heatmap of correlations
-heat_df <- df %>% 
-    select(-c(Diagnosis.y)) %>% 
-    mutate(Trial = as.numeric(as.factor(Trial))) %>% 
-    mutate(Diagnosis.x = as.numeric(as.factor(Diagnosis.x))) %>% 
-    mutate(Gender = as.numeric(as.factor(Gender)))
-
+# Creating heatmap of correlations
 heatmap <- round(cor(heat_df), 2) %>%
     reorder_cormat() %>%
     get_upper_tri() %>%
@@ -611,28 +452,14 @@ heatmap <- round(cor(heat_df), 2) %>%
         title.hjust = 0.5
     ))
 
+# Displaying heatmap
 heatmap
 ```
 
 
-## N.B. Remember to save the acoustic features of voice in a separate file, so to be able to load them next time
 
 
-## Reminder of the report to write 
-
-Part 1 - Can we find a difference in acoustic features in schizophrenia?
-
-1) Describe your sample 
-number of studies, number of participants, age, gender, clinical and cognitive features of the two groups. Furthemore, critically assess whether the groups (schizophrenia and controls) are balanced. N.B. you need to take studies into account.
-
-2) Describe the acoustic profile of a schizophrenic voice: which features are different?
-E.g. People with schizophrenia tend to have high-pitched voice, and present bigger swings in their prosody than controls. N.B. look also at effect sizes. How do these findings relate to the meta-analytic findings?
-
-3) Discuss the analysis necessary to replicate the meta-analytic findings
-Look at the results reported in the paper (see meta-analysis in the readings) and see whether they are similar to those you get.
-    3.1) Check whether significance and direction of the effects are similar
-    3.2) Standardize your outcome, run the model and check whether the beta's is roughly matched (matched with hedge's g)
-which fixed and random effects should be included, given your dataset? E.g. what about language and study, age and gender? Discuss also how studies and languages should play a role in your analyses. E.g. should you analyze each study individually? Or each language individually? Or all together? Each of these choices makes some assumptions about how similar you expect the studies/languages to be.
 
 
-- Your report should look like a methods paragraph followed by a result paragraph in a typical article (think the Communication and Cognition paper)
+
+
