@@ -1,0 +1,128 @@
+---
+title: "L6"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pacman::p_load(lme4,tidyverse, purrr,dplyr, caret,e1071)
+```
+
+# WRITING A FUNCTION notes
+You give it a name
+Use the function and then the argument
+name of function = function(argument) {what you want the function to do}
+
+```{r}
+getwd()
+pitch_d <- list.files(path = "/Users/pernillebrams/Desktop/EM3/methods3_A3/Pitch/", pattern = ".txt") #list files we want to deal with. This list has all the names of the pitch files
+```
+
+# Working on the first file:
+```{r}
+# Use read-delim function to read it.
+df <- read_delim(paste0("/Users/pernillebrams/Desktop/EM3/methods3_A3/Pitch/", pitch_d[1]), delim = "\t") #taking the [1] (first) file
+  
+# FUNCTION INFORMATION: Paste0 pastes things together with 0 space between the two strings
+
+vars <- str_match(pitch_d[1], "Study(\\d+)D([01])S(\\d+)T(\\d+)") #we want to work with the name of the FIRST file, so [1] in the pitch_d list. \\d+ is a digit. This is really cool, we extract the variables. We specify what we want.
+
+# We can make vars into a dataframe and rename the columns
+vars <- as.data.frame(t(vars[2:length(vars)])) # why the t? 
+names(vars) <- c("study", "diagnosis", "subject", "trial")
+
+# We want now to extract the descriptors
+mean <- mean(df$f0)
+sd <- sd(df$f0)
+min <- min(df$f0)
+max <- max(df$f0)
+iqr <- IQR(df$f0)
+
+# We want those not in vectors but as a dataframe, so we add them with cbind
+df <- cbind(vars, data.frame(mean,sd,min,max,iqr))
+```
+
+Writing the function that we will call read_pitch and calling our argument filename. Put all the fun stuff in the curlys
+```{r}
+read_pitch <- function(filename){
+df <- read_delim(paste0("/Users/pernillebrams/Desktop/EM3/methods3_A3/Pitch/", filename), delim = "\t")
+vars <- str_match(pitch_d[1], "Study(\\d+)D([01])S(\\d+)T(\\d+)")
+vars <- as.data.frame(t(vars[2:length(vars)])) # why the t? 
+names(vars) <- c("study", "diagnosis", "subject", "trial")
+mean <- mean(df$f0)
+sd <- sd(df$f0)
+min <- min(df$f0)
+max <- max(df$f0)
+iqr <- IQR(df$f0)
+df <- cbind(vars, data.frame(mean,sd,min,max,iqr))
+return (df) 
+}
+```
+# Applying function 'read_pitch' to each file in the list with map_df:
+```{r}
+
+pitch_data = list.files(path = "/Users/pernillebrams/Desktop/EM3/methods3_A3/Pitch/", pattern = ".txt") %>% 
+  purrr::map_df(read_pitch)
+
+```
+
+# Making logit 2 prob function:
+```{r}
+# Making Logit 2 prob function
+logit2prob <- function(logit){
+  odds <- exp(logit)
+  prob <- odds/(1+odds)
+  return(prob)
+}
+
+# GETTING SOME PROBABILITIES: 
+
+# Probability of Schizophrenia when predictor = 0, that is, when pause_dur is equal to zero:
+logit2prob(-13.2417) #Prob of schizo: 1.775015e-06
+
+# Probability of Schizophrenia when pause_dur is increased 1 unit:
+logit2prob(0.2045) #Prob of schizo: 0.55%
+```
+
+
+# WORKING WITH OUR OWN DATA
+```{r}
+# Reading in our own data :) We only have the 4 Danish studies fyi
+df <- read.csv("npause_fixed.csv")
+
+df$Diagnosis <- as.factor(df$Diagnosis.y)
+df$Participant <- as.character(df$Participant)
+
+# Making a model
+pausedur_model <- glmer(
+  Diagnosis ~ pause_dur_scaled + (1|Participant), family = "binomial", data = df
+)
+
+summary(pausedur_model)
+
+# Making predicted values
+df$pred <- logit2prob(predict(pausedur_model))
+df$pred <- as.numeric(df$pred)
+
+# Predicted values from the model, and applying function to get the probabilities
+df$pred[df$pred > 0.5] = "Schizophrenia"
+df$pred[as.numeric(df$pred) <= 0.5] = "Control"
+df$pred <- as.factor(df$pred)
+
+# Making confusionMatrix
+confusionMatrix(data = df$pred, reference = df$Diagnosis, positive = "Schizophrenia")
+
+```
+
+# MAKING A CURVE that is very help such results
+```{r}
+pacman::p_load(pROC)
+rocCurve <- roc(response = df$Diagnosis, predictor = df$pred)
+auc(rocCurve) #amazing
+ci(rocCurve)
+plot(rocCurve, legacy.axes = TRUE) + title("such results very help")
+```
+
