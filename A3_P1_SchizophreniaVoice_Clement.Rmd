@@ -114,7 +114,11 @@ p_load(purrr, tidyverse)
 
 
 ```{r}
-pacman::p_load(tidyverse, stringr,purrr)
+pacman::p_load(tidyverse, stringr,purrr, lme4)
+
+?read.delim
+
+
 
 read_pitch <- function(filename) {
     # load data
@@ -234,19 +238,35 @@ I like to use group_by() %>% summarize() for quick summaries
 
 ```{r}
 #This is the data which is danish, and filtered for NAs
-sounddata <- read_csv("sounddata.csv")
 
-sounddata %>%
-    group_by(SANS)
+#df <- read_csv("sounddata.csv")
+
+#REAL DF
+df <- read_csv("npause_fixed.csv")
+
+ggplot(df, aes(x = Trial, y = dur..s.)) + geom_point() + theme_minimal()
+
+mean(df$dur..s.)
+mean(df$phonationtime..s.)
+
+df %>% group_by(SANS) %>% summarise(n())
+
+df %>% group_by(Diagnosis.y) %>% summarize(n())
+
+df %>% group_by(Gender) %>% summarize(n())
+
+df %>% group_by(Study.y, Gender) %>% summarize(n())
+
+df %>% group_by(Study.y) %>% summarize(n())
 
 ```
 
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
-- pitch variability ((dur..s. - phonation..s.) /npause) (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09)
+- pitch variability (lower, Hedges' g: -0.55, 95% CIs: -1.06, 0.09)
 - proportion of spoken time (phonationtime..s.) (lower, Hedges' g: -1.26, 95% CIs: -2.26, 0.25)
 - speech rate (speechrate..nsyll.dur.) (slower, Hedges' g: -0.75, 95% CIs: -1.51, 0.04)
-- pause duration (longer, Hedges' g: 1.89, 95% CIs: 0.72, 3.21). (Duration - Spoken Duration) / PauseN
+- pause duration (longer, Hedges' g: 1.89, 95% CIs: 0.72, 3.21). (Duration - Spoken Duration) / PauseN ====== ((dur..s. - phonation..s.) /npause) 
 
 We need therefore to set up 4 models to see how well our results compare to the meta-analytic findings (Feel free of course to test more features)
 Describe the acoustic profile of a schizophrenic voice
@@ -256,13 +276,81 @@ N.B. the meta-analytic findings are on scaled measures. If you want to compare y
 N.N.B. We want to think carefully about fixed and random effects in our model. In particular: how should study be included? Does it make sense to have all studies put together? Does it make sense to analyze both languages together? Relatedly: does it make sense to scale all data from all studies together?
 N.N.N.B. If you want to estimate the studies separately, you can try this syntax:  Feature ~ 0 + Study + Study:Diagnosis + [your randomEffects]. Now you'll have an intercept per each study (the estimates for the controls) and an effect of diagnosis per each study
 
+```{r}
+m1 <- glm(data = df, Diagnosis.x ~ IQR_scaled, family = 'binomial')
+#summary(m1)
+
+m2 <-
+    glm(data = df,
+        Diagnosis.x ~ ProportionSpokenTime_scaled,
+        family = 'binomial')
+#summary(m2)
+
+m3 <-
+    glm(data = df,
+        Diagnosis.x ~ SpeechRate_scaled,
+        family = 'binomial')
+#summary(m3)
+
+m4 <-
+    glm(data = df,
+        Diagnosis.x ~ pause_dur_scaled,
+        family = 'binomial')
+#summary(m4)
+
+
+pitch_vari_model <- glmer(data = df,
+                          Diagnosis.x ~ IQR_scaled + (1 |
+                                                          Participant),
+                          family = 'binomial')
+summary(pitch_vari_model)
+
+
+
+SpokenTime_model <- glmer(
+    data = df,
+    Diagnosis.x ~ ProportionSpokenTime_scaled + (1 | Participant),
+    family = 'binomial'
+)
+#summary(SpokenTime_model)
+
+SpeechRate_model <-
+    glmer(
+        data = df,
+        Diagnosis.x ~ SpeechRate_scaled + (1 | Participant),
+        family = 'binomial'
+    )
+#summary(SpeechRate_model)
+
+pause_dur_model <-
+    glmer(data = df,
+          Diagnosis.x ~ pause_dur_scaled  + (1 | Participant),
+          family = 'binomial')
+summary(pause_dur_model)
+
+
+#Creating a dataframe only with the relevant factors for the prediction
+
+#Plotting logistic regression
+#model = model
+# newdat <- data.frame(IQR_scaled=seq(min(df$IQR_scaled), max(df$IQR_scaled),len=100))
+# 
+# newdat$IQR_scaled = predict(pitch_vari_model, newdata=newdat, type="response")
+# plot(Diagnosis.x~IQR_scaled, data=df, col="red4")
+# lines(Diagnosis.x ~ IQR_scaled, newdat, col="green4", lwd=2)
+
+anova(pitch_vari_model, SpokenTime_model, SpeechRate_model, pause_dur_model)
+
+```
+
+
 - Bonus points: cross-validate the models and report the betas and standard errors from all rounds to get an idea of how robust the estimates are. 
 
 ```{r}
 sounddata <- sounddata %>%
     mutate(pause_dur = (dur..s. - phonationtime..s.)/npause)
 
-model1 <- 
+
 
 
    set.seed(1)
