@@ -107,6 +107,8 @@ Tip: Load one file (as a sample) and:
 Only then (when everything works) turn the code into a function and use map_df() to apply it to all the files.
 See placeholder code here for help.
 
+# This part of the code was written by JJ
+
 ```{r}
 library(pacman)
 
@@ -222,6 +224,8 @@ Arti_data <- read.delim('Articulation.txt', sep = ',', header = T)
 
 ```
 
+# This part of the code was written by KK
+
 ### Now you need to merge demographic/clinical, duration and pitch data
 
 ```{r}
@@ -309,6 +313,8 @@ df$Diagnosis.x <- as.factor(df$Diagnosis.x)
 #write.csv(df, 'npause_fixed.csv')
 ```
 
+# This part of the code was written by CP
+
 ## Now we need to describe our sample
 
 First look at the missing data: we should exclude all recordings for which we do not have complete data.
@@ -360,6 +366,8 @@ df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SAPS)) # Mean SAPS by s
 df %>% group_by(Study.y, Diagnosis.y) %>% summarize(mean(SANS)) # Mean SANS by study and diagnosis
 
 ```
+
+# This part of the code was written by PB
 
 ## Now we can analyze the data
 If you were to examine the meta analysis you would find that the differences (measured as Hedges' g, very close to Cohen's d, that is, in standard deviations) to be the following
@@ -461,6 +469,7 @@ heatmap <- round(cor(heat_df), 2) %>%
 heatmap
 ```
 
+# This part of the code was written by SOH
 
 ```{r}
 # Building models
